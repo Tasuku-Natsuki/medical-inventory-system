@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}患者-セット紐付け一覧 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-link-45deg"></i> 患者-セット紐付け一覧</h1>
+    <a href="{{ url_for('add_patient_set') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> 新規登録
+    </a>
+</div>
+
+{% if patient_sets %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>名前</th>
+                        <th>患者名</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient_set in patient_sets %}
+                    <tr>
+                        <td>{{ patient_set.name }}</td>
+                        <td>{{ patient_set.patient.name }}</td>
+                        <td>
+                            <a href="{{ url_for('patient_set_detail', set_id=patient_set.id) }}" class="btn btn-sm btn-info">
+                                <i class="bi bi-pencil"></i> 編集
+                            </a>
+                            <form method="post" action="{{ url_for('use_patient_set', set_id=patient_set.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <i class="bi bi-box-arrow-right"></i> 使用
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> 患者とセットの紐付けがありません。「新規登録」から登録してください。
+</div>
+{% endif %}
+{% endblock %}
