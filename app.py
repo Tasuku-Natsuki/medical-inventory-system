@@ -11,9 +11,32 @@ from reportlab.lib.units import mm
 import json
 import csv
 from werkzeug.utils import secure_filename
+import logging
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '4ELMydzP8QszZd9yXG3U')
+
+# コンフィグ更新
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+
+# ログの設定
+is_production = os.environ.get('RENDER', False)
+if is_production:
+    # 本番環境ではファイルにログを出力
+    logging.basicConfig(
+        level=logging.ERROR,
+        format='%(asctime)s %(levelname)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    # エラーハンドラー設定
+    @app.errorhandler(500)
+    def internal_error(error):
+        app.logger.error(f'Server Error: {error}')
+        return "Internal Server Error: Please check the logs for details", 500
+else:
+    # 開発環境では詳細なログを出力
+    logging.basicConfig(level=logging.DEBUG)
 
 # SQLAlchemyの設定
 db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
@@ -21,7 +44,6 @@ if not os.path.exists(db_path):
     os.makedirs(db_path)
 
 # データベースのパスを環境に応じて設定
-is_production = os.environ.get('RENDER', False)
 if is_production:
     # Render環境では/tmpディレクトリを使用
     db_file = '/tmp/inventory.db'
@@ -34,7 +56,7 @@ else:
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# データベースの初期化
 db = SQLAlchemy(app)
 
 # テンプレートにグローバル変数を追加
@@ -819,120 +841,128 @@ def clear_all_data():
 
 # フォントの登録
 # プラットフォームに依存しないフォント設定
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.fonts import addMapping
+
+# ビルトインフォントを使用
 try:
-    # Windows環境の場合
-    if os.name == 'nt' and 'WINDIR' in os.environ:
-        font_path = os.path.join(os.environ['WINDIR'], 'Fonts', 'msgothic.ttc')
-        pdfmetrics.registerFont(TTFont('MS-Gothic', font_path))
-    else:
-        # Linux/Mac環境の場合はDejaVuSansを使用
-        pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
-        # フォール名の別名登録
-        pdfmetrics.registerFontFamily('DejaVuSans', normal='DejaVuSans')
-        # MS-Gothicという名前でDejaVuSansを使用
-        pdfmetrics.registerFontFamily('MS-Gothic', normal='DejaVuSans')
+    # ReportLabのデフォルトフォントを使用
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
+    from reportlab.lib.fonts import addMapping
+    
+    # Helveticaをデフォルトフォントとして登録
+    pdfmetrics.registerFontFamily('Helvetica')
+    
+    # MS-GothicとしてHelveticaを使用（代替）
+    pdfmetrics.registerFontFamily('MS-Gothic', normal='Helvetica', bold='Helvetica-Bold')
+    
+    app.logger.info("デフォルトフォントを登録しました")
 except Exception as e:
-    print(f"フォント登録エラー: {e}")
-    # フォント登録に失敗した場合はデフォルトのHelveticaを使用
-    # MS-Gothicの別名としてHelveticaを登録
-    pdfmetrics.registerFontFamily('MS-Gothic', normal='Helvetica')
+    app.logger.error(f"フォント登録エラー: {e}")
+    # フォント登録に失敗しても処理を続行
 
 @app.route('/generate_pdf/<int:order_id>')
 def generate_pdf(order_id):
-    order = Order.query.get_or_404(order_id)
-    supplier = order.supplier
-    order_items = OrderItem.query.filter_by(order_id=order.id).all()
-    
-    # クリニック情報を取得
-    clinic_info = ClinicInfo.query.first()
-    if not clinic_info:
-        clinic_info = ClinicInfo(name="訪問診療クリニック")
-        db.session.add(clinic_info)
-        db.session.commit()
-    
-    # PDF生成
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    
-    # 日本語フォントを使用
-    p.setFont("MS-Gothic", 18)
-    p.drawString(50, 800, "発注書")
-    
-    # 発注日（右上）
-    p.setFont("MS-Gothic", 12)
-    p.drawString(400, 800, f"発注日: {order.order_date.strftime('%Y年%m月%d日')}")
-    p.drawString(400, 780, f"発注番号: {order.id}")
-    
-    # 発注先情報（左上）
-    y_supplier = 750
-    p.drawString(50, y_supplier, f"【発注先】")
-    p.drawString(50, y_supplier - 20, f"{supplier.name}")
-    
-    if supplier.address:
-        p.drawString(50, y_supplier - 40, f"住所: {supplier.address}")
-        y_supplier -= 20
-    
-    if supplier.fax_number:
-        p.drawString(50, y_supplier - 40, f"FAX: {supplier.fax_number}")
-        y_supplier -= 20
-    
-    if supplier.email:
-        p.drawString(50, y_supplier - 40, f"メール: {supplier.email}")
-    
-    # 発注元クリニック情報（右下）
-    y_clinic = 650
-    p.drawString(350, y_clinic, f"【発注元】")
-    p.drawString(350, y_clinic - 20, f"{clinic_info.name}")
-    
-    if clinic_info.director:
-        p.drawString(350, y_clinic - 40, f"院長: {clinic_info.director}")
-        y_clinic -= 20
+    try:
+        order = Order.query.get_or_404(order_id)
+        supplier = order.supplier
+        order_items = OrderItem.query.filter_by(order_id=order.id).all()
         
-    if clinic_info.address:
-        p.drawString(350, y_clinic - 40, f"住所: {clinic_info.address}")
-        y_clinic -= 20
-    
-    if clinic_info.phone:
-        p.drawString(350, y_clinic - 40, f"TEL: {clinic_info.phone}")
-        y_clinic -= 20
-    
-    if clinic_info.fax:
-        p.drawString(350, y_clinic - 40, f"FAX: {clinic_info.fax}")
-    
-    # 区切り線
-    p.line(50, 580, 550, 580)
-    
-    # テーブルヘッダー
-    p.setFont("MS-Gothic", 12)
-    p.drawString(50, 560, "商品名")
-    p.drawString(300, 560, "数量")
-    p.drawString(400, 560, "単位")
-    p.line(50, 550, 550, 550)
-    
-    # テーブル内容
-    y = 530
-    p.setFont("MS-Gothic", 12)
-    for order_item in order_items:
-        item = order_item.item
-        p.drawString(50, y, item.name)
-        p.drawString(300, y, str(order_item.quantity))
-        unit = "箱" if item.unit_type == "box" else "個"
-        p.drawString(400, y, unit)
-        y -= 20
-    
-    # 備考
-    p.drawString(50, 100, "備考:")
-    p.drawString(50, 80, "このFAXは自動生成されています。")
-    
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    
-    # 発注のステータスを更新
-    order.status = 'sent'
-    db.session.commit()
-    
-    return send_file(buffer, as_attachment=True, download_name=f"order_{order_id}.pdf", mimetype='application/pdf')
+        # クリニック情報を取得
+        clinic_info = ClinicInfo.query.first()
+        if not clinic_info:
+            clinic_info = ClinicInfo(name="訪問診療クリニック")
+            db.session.add(clinic_info)
+            db.session.commit()
+        
+        # PDF生成
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        
+        # 日本語フォントを使用
+        p.setFont("MS-Gothic", 18)
+        p.drawString(50, 800, "発注書")
+        
+        # 発注日（右上）
+        p.setFont("MS-Gothic", 12)
+        p.drawString(400, 800, f"発注日: {order.order_date.strftime('%Y年%m月%d日')}")
+        p.drawString(400, 780, f"発注番号: {order.id}")
+        
+        # 発注先情報（左上）
+        y_supplier = 750
+        p.drawString(50, y_supplier, f"【発注先】")
+        p.drawString(50, y_supplier - 20, f"{supplier.name}")
+        
+        if supplier.address:
+            p.drawString(50, y_supplier - 40, f"住所: {supplier.address}")
+            y_supplier -= 20
+        
+        if supplier.fax_number:
+            p.drawString(50, y_supplier - 40, f"FAX: {supplier.fax_number}")
+            y_supplier -= 20
+        
+        if supplier.email:
+            p.drawString(50, y_supplier - 40, f"メール: {supplier.email}")
+        
+        # 発注元クリニック情報（右下）
+        y_clinic = 650
+        p.drawString(350, y_clinic, f"【発注元】")
+        p.drawString(350, y_clinic - 20, f"{clinic_info.name}")
+        
+        if clinic_info.director:
+            p.drawString(350, y_clinic - 40, f"院長: {clinic_info.director}")
+            y_clinic -= 20
+            
+        if clinic_info.address:
+            p.drawString(350, y_clinic - 40, f"住所: {clinic_info.address}")
+            y_clinic -= 20
+        
+        if clinic_info.phone:
+            p.drawString(350, y_clinic - 40, f"TEL: {clinic_info.phone}")
+            y_clinic -= 20
+        
+        if clinic_info.fax:
+            p.drawString(350, y_clinic - 40, f"FAX: {clinic_info.fax}")
+        
+        # 区切り線
+        p.line(50, 580, 550, 580)
+        
+        # テーブルヘッダー
+        p.setFont("MS-Gothic", 12)
+        p.drawString(50, 560, "商品名")
+        p.drawString(300, 560, "数量")
+        p.drawString(400, 560, "単位")
+        p.line(50, 550, 550, 550)
+        
+        # テーブル内容
+        y = 530
+        p.setFont("MS-Gothic", 12)
+        for order_item in order_items:
+            item = order_item.item
+            p.drawString(50, y, item.name)
+            p.drawString(300, y, str(order_item.quantity))
+            unit = "箱" if item.unit_type == "box" else "個"
+            p.drawString(400, y, unit)
+            y -= 20
+        
+        # 備考
+        p.drawString(50, 100, "備考:")
+        p.drawString(50, 80, "このFAXは自動生成されています。")
+        
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        
+        # 発注のステータスを更新
+        order.status = 'sent'
+        db.session.commit()
+        
+        return send_file(buffer, as_attachment=True, download_name=f"order_{order_id}.pdf", mimetype='application/pdf')
+    except Exception as e:
+        app.logger.error(f"PDF生成エラー: {e}")
+        flash(f'PDF生成中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/monthly_report', methods=['GET', 'POST'])
 def monthly_report():
