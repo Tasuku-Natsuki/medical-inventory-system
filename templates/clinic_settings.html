@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}クリニック情報設定 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 offset-lg-2">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h1 class="h4 mb-0"><i class="bi bi-hospital"></i> クリニック情報設定</h1>
+                <a href="{{ url_for('index') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-left"></i> 戻る
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-info-circle"></i> このクリニック情報は発注書や帳票に反映されます。
+                </div>
+                
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">クリニック名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ clinic.name }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="director" class="form-label">院長名</label>
+                        <input type="text" class="form-control" id="director" name="director" 
+                               value="{{ clinic.director or '' }}" placeholder="例: 山田 太郎">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">住所</label>
+                        <textarea class="form-control" id="address" name="address" rows="2" 
+                                  placeholder="例: 〒100-0001 東京都千代田区千代田1-1">{{ clinic.address or '' }}</textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">電話番号</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   value="{{ clinic.phone or '' }}" placeholder="例: 03-1234-5678">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="fax" class="form-label">FAX番号</label>
+                            <input type="tel" class="form-control" id="fax" name="fax" 
+                                   value="{{ clinic.fax or '' }}" placeholder="例: 03-1234-5679">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">メールアドレス</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ clinic.email or '' }}" placeholder="例: info@clinic.example.com">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="website" class="form-label">ウェブサイト</label>
+                        <input type="url" class="form-control" id="website" name="website" 
+                               value="{{ clinic.website or '' }}" placeholder="例: https://www.clinic-example.com">
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> 設定を保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

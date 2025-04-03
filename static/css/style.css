@@ -1,0 +1,80 @@
+/* 全体のスタイル */
+body {
+    padding-bottom: 70px;
+    font-family: 'Meiryo', 'Hiragino Kaku Gothic Pro', sans-serif;
+}
+
+/* カード要素のスタイル */
+.card {
+    margin-bottom: 20px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+/* テーブルのスタイル */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+/* アイコンのスタイル */
+.btn i {
+    margin-right: 5px;
+}
+
+/* 数量入力のスタイル */
+.quantity-input {
+    width: 80px;
+    text-align: center;
+}
+
+.quantity-control {
+    display: flex;
+    align-items: center;
+}
+
+.quantity-control button {
+    width: 35px;
+    height: 35px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* フォームグループのスタイル */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+/* ダッシュボードのカードスタイル */
+.dashboard-card {
+    border-radius: 10px;
+    transition: transform 0.3s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+
+.dashboard-icon {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    .hide-mobile {
+        display: none;
+    }
+    
+    .table-responsive {
+        font-size: 0.9rem;
+    }
+}

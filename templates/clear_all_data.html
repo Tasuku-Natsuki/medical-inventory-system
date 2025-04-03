@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}データ初期化 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 offset-lg-2">
+        <div class="card shadow border-danger">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <h2 class="h4 mb-0"><i class="bi bi-exclamation-triangle"></i> データ初期化の確認</h2>
+                <a href="{{ url_for('index') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-left"></i> ホームに戻る
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning mb-4">
+                    <h5><i class="bi bi-exclamation-circle"></i> 警告</h5>
+                    <p>この操作はデータベース内の全てのデータを削除します。この操作は取り消せません。</p>
+                    <p>削除されるデータ:</p>
+                    <ul>
+                        <li>全ての備品データ</li>
+                        <li>全ての患者データ</li>
+                        <li>全ての患者セットデータ</li>
+                        <li>全ての備品セットデータ</li>
+                        <li>全ての使用履歴データ</li>
+                        <li>全ての発注履歴データ</li>
+                        <li>クリニック情報データ</li>
+                    </ul>
+                </div>
+                
+                <form method="post">
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="clear_suppliers" name="clear_suppliers" value="yes">
+                            <label class="form-check-label" for="clear_suppliers">
+                                <strong>発注先データも削除する</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">チェックしない場合、発注先データは保持されます。</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-x-circle"></i> キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('本当に全てのデータを削除しますか？この操作は取り消せません。');">
+                            <i class="bi bi-trash"></i> 全データを削除する
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

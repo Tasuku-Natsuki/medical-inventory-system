@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1 class="mb-4">訪問診療クリニック備品管理システム</h1>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-info-circle"></i> ようこそ
+            </div>
+            <div class="card-body">
+                <p>このシステムでは、訪問診療クリニックで使用される医療備品を簡単に記録・発注できます。</p>
+                <p>使用後すぐに発注書を自動作成し、印刷してFAX送信することで、在庫切れや管理の手間を削減します。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 備品使用登録 -->
+    <div class="col-md-4 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-primary">
+                    <i class="bi bi-box"></i>
+                </div>
+                <h5 class="card-title">備品使用登録</h5>
+                <p class="card-text">備品を使用したら記録し、自動発注</p>
+                <a href="{{ url_for('use_item') }}" class="btn btn-primary">使用登録</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- セット使用登録 -->
+    <div class="col-md-4 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-success">
+                    <i class="bi bi-collection"></i>
+                </div>
+                <h5 class="card-title">セット使用登録</h5>
+                <p class="card-text">患者ごとのセットを簡単に使用登録</p>
+                <a href="{{ url_for('use_set') }}" class="btn btn-success">セット使用</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 発注履歴 -->
+    <div class="col-md-4 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-danger">
+                    <i class="bi bi-file-earmark-text"></i>
+                </div>
+                <h5 class="card-title">発注履歴</h5>
+                <p class="card-text">過去の発注書を確認・印刷</p>
+                <a href="{{ url_for('orders') }}" class="btn btn-danger">発注履歴</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-3">
+    <!-- 備品一覧 -->
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-info">
+                    <i class="bi bi-list-ul"></i>
+                </div>
+                <h5 class="card-title">備品一覧</h5>
+                <a href="{{ url_for('items') }}" class="btn btn-info text-white">一覧表示</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 患者管理 -->
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-warning">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h5 class="card-title">患者管理</h5>
+                <a href="{{ url_for('patients') }}" class="btn btn-warning">管理画面</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- セット管理 -->
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-secondary">
+                    <i class="bi bi-grid"></i>
+                </div>
+                <h5 class="card-title">セット管理</h5>
+                <a href="{{ url_for('item_sets') }}" class="btn btn-secondary">管理画面</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 月次レポート -->
+    <div class="col-md-3 mb-3">
+        <div class="card dashboard-card text-center h-100 bg-light">
+            <div class="card-body">
+                <div class="dashboard-icon text-dark">
+                    <i class="bi bi-bar-chart"></i>
+                </div>
+                <h5 class="card-title">月次レポート</h5>
+                <a href="{{ url_for('monthly_report') }}" class="btn btn-dark">レポート表示</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}{{ patient.name }} のセット管理 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3"><i class="bi bi-person-gear"></i> 患者固有セット管理</h1>
+                <a href="{{ url_for('patients') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> 患者一覧に戻る
+                </a>
+            </div>
+            <div class="alert alert-info mt-3">
+                <strong>患者:</strong> {{ patient.name }} (ID: {{ patient.patient_id }})
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h2 class="h5 mb-0"><i class="bi bi-collection"></i> 登録済みセット</h2>
+                    <a href="{{ url_for('add_patient_set') }}?patient_id={{ patient.id }}" class="btn btn-sm btn-light">
+                        <i class="bi bi-plus-circle"></i> 新規セット追加
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if patient_sets %}
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>セット名</th>
+                                    <th>備品数</th>
+                                    <th class="text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for set in patient_sets %}
+                                <tr>
+                                    <td>{{ set.name }}</td>
+                                    <td>
+                                        {% set items_count = set.items|length %}
+                                        {{ items_count }} 個の備品
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('patient_set_detail', set_id=set.id) }}" class="btn btn-sm btn-info">
+                                                <i class="bi bi-pencil"></i> 編集
+                                            </a>
+                                            <a href="{{ url_for('use_patient_set', set_id=set.id) }}" class="btn btn-sm btn-success">
+                                                <i class="bi bi-box-arrow-right"></i> 使用
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-danger" 
+                                                    data-bs-toggle="modal" 
+                                                    data-bs-target="#deleteModal{{ set.id }}">
+                                                <i class="bi bi-trash"></i> 削除
+                                            </button>
+                                        </div>
+                                        
+                                        <!-- 削除確認モーダル -->
+                                        <div class="modal fade" id="deleteModal{{ set.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header bg-danger text-white">
+                                                        <h5 class="modal-title">セット削除の確認</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p>セット「{{ set.name }}」を削除しますか？</p>
+                                                        <p class="text-danger">
+                                                            <i class="bi bi-exclamation-triangle"></i> この操作は元に戻せません。
+                                                        </p>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                                                        <a href="{{ url_for('delete_patient_set', set_id=set.id) }}" class="btn btn-danger">削除する</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> この患者に登録されているセットはありません。
+                        <a href="{{ url_for('add_patient_set') }}?patient_id={{ patient.id }}" class="alert-link">こちら</a>から新しいセットを追加できます。
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- セット使用履歴 -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h2 class="h5 mb-0"><i class="bi bi-clock-history"></i> 最近の使用履歴</h2>
+                </div>
+                <div class="card-body">
+                    <!-- 使用履歴テーブルを実装予定 -->
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> この患者のセット使用履歴が表示されます（開発中）。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

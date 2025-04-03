@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}疾患セット一覧 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h2 class="h4 mb-0"><i class="bi bi-heart-pulse"></i> 疾患セット一覧</h2>
+                <a href="{{ url_for('add_disease_set') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-plus-circle"></i> 新規作成
+                </a>
+            </div>
+            <div class="card-body">
+                {% if disease_sets %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>セット名</th>
+                                <th>説明</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for disease_set in disease_sets %}
+                            <tr>
+                                <td>{{ disease_set.name }}</td>
+                                <td>{{ disease_set.description|truncate(50) }}</td>
+                                <td>
+                                    <a href="{{ url_for('disease_set_detail', set_id=disease_set.id) }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-pencil"></i> 編集
+                                    </a>
+                                    <form method="post" action="{{ url_for('use_disease_set', set_id=disease_set.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-success">
+                                            <i class="bi bi-box-arrow-right"></i> 使用
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 疾患セットが登録されていません。「新規作成」ボタンから疾患セットを追加してください。
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

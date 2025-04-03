@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}セット使用登録 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h2 class="h4 mb-0"><i class="bi bi-collection"></i> セット使用登録</h2>
+                <a href="{{ url_for('index') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-left"></i> 戻る
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="patient-select" class="form-label">患者 <small class="text-muted">(任意 - 汎用セットのみ使用する場合は不要)</small></label>
+                        <select class="form-select" id="patient-select" name="patient_id">
+                            <option value="">-- 患者を選択 --</option>
+                            {% for patient in patients %}
+                            <option value="{{ patient.id }}" {% if selected_patient_id == patient.id %}selected{% endif %}>
+                                {{ patient.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <ul class="nav nav-tabs mb-3" id="setTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="patient-sets-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#patient-sets" type="button" role="tab" 
+                                    aria-controls="patient-sets" aria-selected="true">
+                                患者固有セット
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="generic-sets-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#generic-sets" type="button" role="tab" 
+                                    aria-controls="generic-sets" aria-selected="false">
+                                汎用セット
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="setTabsContent">
+                        <div class="tab-pane fade show active" id="patient-sets" role="tabpanel" aria-labelledby="patient-sets-tab">
+                            <div id="patient-sets-content">
+                                {% if patient_sets %}
+                                <div class="mb-3">
+                                    <label for="patient_set_id" class="form-label">患者固有セット</label>
+                                    <select class="form-select" id="patient_set_id" name="patient_set_id">
+                                        <option value="">-- 患者固有セットを選択 --</option>
+                                        {% for patient_set in patient_sets %}
+                                        <option value="{{ patient_set.id }}">{{ patient_set.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle"></i> 選択された患者には固有セットが登録されていません。
+                                    <a href="{{ url_for('add_patient_set') }}" class="alert-link">こちら</a>から患者固有セットを登録するか、汎用セットを選択してください。
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div id="no-patient-selected" class="alert alert-info" style="display: none;">
+                                <i class="bi bi-info-circle"></i> 患者固有セットを使用するには、患者を選択してください。
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="generic-sets" role="tabpanel" aria-labelledby="generic-sets-tab">
+                            {% if item_sets %}
+                            <div class="mb-3">
+                                <label for="item_set_id" class="form-label">汎用セット</label>
+                                <select class="form-select" id="item_set_id" name="item_set_id">
+                                    <option value="">-- 汎用セットを選択 --</option>
+                                    {% for item_set in item_sets %}
+                                    <option value="{{ item_set.id }}">{{ item_set.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 汎用セットが登録されていません。
+                                <a href="{{ url_for('add_item_set') }}" class="alert-link">こちら</a>から汎用セットを登録してください。
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i> セットを使用すると、セット内の全ての備品が使用登録され、必要に応じて自動発注されます。いずれかのタイプのセットを選択してください。
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('index') }}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-x-circle"></i> キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> 使用登録
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const patientSelect = document.getElementById('patient-select');
+        const patientSetsContent = document.getElementById('patient-sets-content');
+        const noPatientSelected = document.getElementById('no-patient-selected');
+        const patientSetId = document.getElementById('patient_set_id');
+        const itemSetId = document.getElementById('item_set_id');
+        const patientSetsTab = document.getElementById('patient-sets-tab');
+        const genericSetsTab = document.getElementById('generic-sets-tab');
+
+        // 患者選択状態によるUIの切り替え
+        function togglePatientSetAvailability() {
+            if (patientSelect.value) {
+                patientSetsContent.style.display = 'block';
+                noPatientSelected.style.display = 'none';
+            } else {
+                patientSetsContent.style.display = 'none';
+                noPatientSelected.style.display = 'block';
+                // 患者が選択されていない場合は強制的に汎用セットタブに切り替え
+                if (patientSetsTab.classList.contains('active')) {
+                    genericSetsTab.click();
+                }
+            }
+        }
+
+        // 初期状態でチェック
+        togglePatientSetAvailability();
+        
+        // 患者選択が変更されたら実行
+        patientSelect.addEventListener('change', togglePatientSetAvailability);
+        
+        // タブ切り替え時にセレクトボックスの値をリセット
+        document.querySelectorAll('#setTabs button').forEach(function(button) {
+            button.addEventListener('click', function() {
+                if (this.id === 'patient-sets-tab') {
+                    itemSetId.value = '';
+                    
+                    // 患者が選択されていなければ汎用セットに切り替え
+                    if (!patientSelect.value) {
+                        genericSetsTab.click();
+                    }
+                } else {
+                    patientSetId.value = '';
+                }
+            });
+        });
+        
+        // フォーム送信前の検証
+        document.querySelector('form').addEventListener('submit', function(e) {
+            // 患者固有セットを選択する場合は患者IDが必要
+            if (patientSetId.value && !patientSelect.value) {
+                e.preventDefault();
+                alert('患者固有セットを使用するには、患者を選択してください');
+                return;
+            }
+            
+            // いずれかのセットタイプが選択されていることを確認
+            if (!patientSetId.value && !itemSetId.value) {
+                e.preventDefault();
+                alert('患者固有セットか汎用セットのいずれかを選択してください');
+            }
+        });
+    });
+</script>
+{% endblock %}

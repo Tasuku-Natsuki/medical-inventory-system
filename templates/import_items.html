@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}備品CSVインポート - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 offset-lg-2">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h2 class="h4 mb-0"><i class="bi bi-file-earmark-arrow-up"></i> 備品CSVインポート</h2>
+                <a href="{{ url_for('items') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-left"></i> 備品一覧に戻る
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h5><i class="bi bi-info-circle"></i> CSVファイル形式について</h5>
+                    <p>CSVファイルは以下の列構成で作成してください：</p>
+                    <table class="table table-bordered table-sm">
+                        <thead class="table-light">
+                            <tr>
+                                <th>備品名</th>
+                                <th>単位タイプ</th>
+                                <th>箱当たりの個数</th>
+                                <th>最小在庫数</th>
+                                <th>現在の在庫数</th>
+                                <th>発注先名</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>ディスポ手袋 Mサイズ</td>
+                                <td>box</td>
+                                <td>100</td>
+                                <td>5</td>
+                                <td>10</td>
+                                <td>サンプル医療機器</td>
+                            </tr>
+                            <tr>
+                                <td>消毒用アルコール</td>
+                                <td>individual</td>
+                                <td></td>
+                                <td>10</td>
+                                <td>15</td>
+                                <td>サンプル医療機器</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p>1行目はヘッダー行として扱われるため、データは2行目から記入してください。</p>
+                    <p>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="downloadTemplate">
+                            <i class="bi bi-download"></i> インポートテンプレートをダウンロード
+                        </button>
+                    </p>
+                </div>
+                
+                <form method="post" enctype="multipart/form-data">
+                    <div class="mb-4">
+                        <label for="csv_file" class="form-label">CSVファイル選択 <span class="text-danger">*</span></label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                        <div class="form-text">UTF-8形式のCSVファイルを選択してください。</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>現在登録されている発注先</h5>
+                        <p>CSVファイルで発注先を指定する場合は、以下の発注先名を正確に入力してください：</p>
+                        <ul class="list-group">
+                            {% for supplier in suppliers %}
+                            <li class="list-group-item">{{ supplier.name }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('items') }}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-x-circle"></i> キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload"></i> インポート実行
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // テンプレートCSVのダウンロード処理
+        document.getElementById('downloadTemplate').addEventListener('click', function() {
+            const csvContent = `備品名,単位タイプ,箱当たりの個数,最小在庫数,現在の在庫数,発注先名
+ディスポ手袋 Mサイズ,box,100,5,10,サンプル医療機器
+ディスポ手袋 Lサイズ,box,100,5,7,サンプル医療機器
+消毒用アルコール,individual,,10,15,サンプル医療機器
+血圧計,individual,,2,3,メディカルサプライ
+体温計,individual,,5,6,メディカルサプライ`;
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'items_import_template.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    });
+</script>
+{% endblock %}
