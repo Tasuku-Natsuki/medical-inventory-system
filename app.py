@@ -1252,6 +1252,60 @@ def clinic_settings():
     
     return render_template('clinic_settings.html', clinic=clinic_info)
 
+@app.route('/edit_item/<int:item_id>', methods=['GET', 'POST'])
+def edit_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    suppliers = Supplier.query.all()
+    
+    if request.method == 'POST':
+        item.name = request.form['name']
+        item.unit_type = request.form['unit_type']
+        
+        if item.unit_type == 'box' and request.form['items_per_box']:
+            item.items_per_box = int(request.form['items_per_box'])
+        else:
+            item.items_per_box = None
+            
+        item.minimum_stock = int(request.form['minimum_stock'])
+        item.current_stock = int(request.form['current_stock'])
+        
+        supplier_id = request.form.get('supplier_id')
+        if supplier_id and supplier_id != 'none':
+            item.supplier_id = int(supplier_id)
+        else:
+            item.supplier_id = None
+            
+        db.session.commit()
+        flash('備品情報を更新しました', 'success')
+        return redirect(url_for('items'))
+        
+    return render_template('edit_item.html', item=item, suppliers=suppliers)
+
+@app.route('/update_stock', methods=['POST'])
+def update_stock():
+    try:
+        item_id = request.form.get('item_id')
+        field = request.form.get('field')
+        value = request.form.get('value')
+        
+        if not all([item_id, field, value]):
+            return jsonify({'success': False, 'message': '必要なパラメータが不足しています'}), 400
+            
+        item = Item.query.get_or_404(item_id)
+        
+        if field == 'current_stock':
+            item.current_stock = int(value)
+        elif field == 'minimum_stock':
+            item.minimum_stock = int(value)
+        else:
+            return jsonify({'success': False, 'message': '無効なフィールドです'}), 400
+            
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"在庫更新エラー: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # データベース初期化
 @app.route('/initialize_db')
 def initialize_db():
