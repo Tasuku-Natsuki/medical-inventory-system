@@ -15,10 +15,22 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '4ELMydzP8QszZd9yXG3U')
 
-# データベース設定
-# 本番環境では環境変数からURLを取得し、開発環境ではSQLiteを使用
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
-# SQLite URLの修正（PostgreSQLとの互換性のため）
+# SQLAlchemyの設定
+db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+if not os.path.exists(db_path):
+    os.makedirs(db_path)
+
+# データベースのパスを環境に応じて設定
+is_production = os.environ.get('RENDER', False)
+if is_production:
+    # Render環境では/tmpディレクトリを使用
+    db_file = '/tmp/inventory.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
+else:
+    # ローカル環境ではinstanceディレクトリを使用
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///instance/inventory.db')
+
+# PostgreSQL URIの修正（Heroku対応）
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 
