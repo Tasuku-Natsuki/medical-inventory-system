@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, redirect, url_for, request, flash, send_file
+from flask import Flask, render_template, redirect, url_for, request, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import io
@@ -838,6 +838,245 @@ def clear_all_data():
             return redirect(url_for('index'))
     
     return render_template('clear_all_data.html')
+
+# バックアップ機能
+@app.route('/backup_data')
+def backup_data():
+    try:
+        # データベースの内容を取得
+        clinic_data = ClinicInfo.query.first()
+        items_data = Item.query.all()
+        suppliers_data = Supplier.query.all()
+        patients_data = Patient.query.all()
+        patient_sets_data = PatientSet.query.all()
+        item_sets_data = ItemSet.query.all()
+        set_items_data = SetItem.query.all()
+        
+        # JSONに変換するための辞書を作成
+        backup = {
+            'clinic': {} if not clinic_data else {
+                'name': clinic_data.name,
+                'address': clinic_data.address,
+                'phone': clinic_data.phone,
+                'fax': clinic_data.fax,
+                'email': clinic_data.email,
+                'website': clinic_data.website,
+                'director': clinic_data.director
+            },
+            'suppliers': [{
+                'id': s.id, 
+                'name': s.name, 
+                'fax_number': s.fax_number,
+                'address': s.address,
+                'email': s.email
+            } for s in suppliers_data],
+            'items': [{
+                'id': i.id,
+                'name': i.name,
+                'unit_type': i.unit_type,
+                'items_per_box': i.items_per_box,
+                'minimum_stock': i.minimum_stock,
+                'current_stock': i.current_stock,
+                'supplier_id': i.supplier_id
+            } for i in items_data],
+            'patients': [{
+                'id': p.id,
+                'name': p.name,
+                'patient_id': p.patient_id,
+                'address': p.address,
+                'phone': p.phone
+            } for p in patients_data],
+            'patient_sets': [{
+                'id': ps.id,
+                'name': ps.name,
+                'patient_id': ps.patient_id
+            } for ps in patient_sets_data],
+            'item_sets': [{
+                'id': its.id,
+                'name': its.name,
+                'description': its.description
+            } for its in item_sets_data],
+            'set_items': [{
+                'id': si.id,
+                'patient_set_id': si.patient_set_id,
+                'item_set_id': si.item_set_id,
+                'item_id': si.item_id,
+                'quantity': si.quantity
+            } for si in set_items_data]
+        }
+        
+        # JSON形式でダウンロード
+        response = jsonify(backup)
+        response.headers.set('Content-Disposition', 'attachment', filename='medical_inventory_backup.json')
+        return response
+    except Exception as e:
+        app.logger.error(f"バックアップエラー: {e}")
+        flash('バックアップの作成中にエラーが発生しました', 'danger')
+        return redirect(url_for('index'))
+
+# 復元機能
+@app.route('/restore_data', methods=['GET', 'POST'])
+def restore_data():
+    if request.method == 'POST':
+        if 'backup_file' not in request.files:
+            flash('バックアップファイルがありません', 'danger')
+            return redirect(request.url)
+            
+        file = request.files['backup_file']
+        if file.filename == '':
+            flash('ファイルが選択されていません', 'danger')
+            return redirect(request.url)
+            
+        if file:
+            try:
+                # JSONファイルを読み込む
+                backup_data = json.loads(file.read().decode('utf-8'))
+                
+                # クリニック情報の復元
+                if backup_data.get('clinic'):
+                    clinic = ClinicInfo.query.first()
+                    if not clinic:
+                        clinic = ClinicInfo()
+                        db.session.add(clinic)
+                    
+                    clinic_data = backup_data['clinic']
+                    clinic.name = clinic_data.get('name', 'クリニック名')
+                    clinic.address = clinic_data.get('address')
+                    clinic.phone = clinic_data.get('phone')
+                    clinic.fax = clinic_data.get('fax')
+                    clinic.email = clinic_data.get('email')
+                    clinic.website = clinic_data.get('website')
+                    clinic.director = clinic_data.get('director')
+                
+                # 発注先情報の復元
+                if backup_data.get('suppliers'):
+                    # 既存のIDマッピングを作成
+                    existing_suppliers = {s.id: s for s in Supplier.query.all()}
+                    
+                    for supplier_data in backup_data['suppliers']:
+                        supplier_id = supplier_data.get('id')
+                        if supplier_id in existing_suppliers:
+                            # 既存の発注先を更新
+                            supplier = existing_suppliers[supplier_id]
+                        else:
+                            # 新規発注先を作成
+                            supplier = Supplier()
+                            db.session.add(supplier)
+                        
+                        supplier.name = supplier_data.get('name')
+                        supplier.fax_number = supplier_data.get('fax_number')
+                        supplier.address = supplier_data.get('address')
+                        supplier.email = supplier_data.get('email')
+                
+                # 備品情報の復元
+                if backup_data.get('items'):
+                    # 既存のIDマッピングを作成
+                    existing_items = {i.id: i for i in Item.query.all()}
+                    
+                    for item_data in backup_data['items']:
+                        item_id = item_data.get('id')
+                        if item_id in existing_items:
+                            # 既存の備品を更新
+                            item = existing_items[item_id]
+                        else:
+                            # 新規備品を作成
+                            item = Item()
+                            db.session.add(item)
+                        
+                        item.name = item_data.get('name')
+                        item.unit_type = item_data.get('unit_type')
+                        item.items_per_box = item_data.get('items_per_box')
+                        item.minimum_stock = item_data.get('minimum_stock')
+                        item.current_stock = item_data.get('current_stock')
+                        item.supplier_id = item_data.get('supplier_id')
+                
+                # 患者情報の復元
+                if backup_data.get('patients'):
+                    # 既存のIDマッピングを作成
+                    existing_patients = {p.id: p for p in Patient.query.all()}
+                    
+                    for patient_data in backup_data['patients']:
+                        patient_id = patient_data.get('id')
+                        if patient_id in existing_patients:
+                            # 既存の患者を更新
+                            patient = existing_patients[patient_id]
+                        else:
+                            # 新規患者を作成
+                            patient = Patient()
+                            db.session.add(patient)
+                        
+                        patient.name = patient_data.get('name')
+                        patient.patient_id = patient_data.get('patient_id')
+                        patient.address = patient_data.get('address')
+                        patient.phone = patient_data.get('phone')
+                
+                # 患者セット情報の復元
+                if backup_data.get('patient_sets'):
+                    # 既存のIDマッピングを作成
+                    existing_patient_sets = {ps.id: ps for ps in PatientSet.query.all()}
+                    
+                    for ps_data in backup_data['patient_sets']:
+                        ps_id = ps_data.get('id')
+                        if ps_id in existing_patient_sets:
+                            # 既存の患者セットを更新
+                            ps = existing_patient_sets[ps_id]
+                        else:
+                            # 新規患者セットを作成
+                            ps = PatientSet()
+                            db.session.add(ps)
+                        
+                        ps.name = ps_data.get('name')
+                        ps.patient_id = ps_data.get('patient_id')
+                
+                # 備品セット情報の復元
+                if backup_data.get('item_sets'):
+                    # 既存のIDマッピングを作成
+                    existing_item_sets = {its.id: its for its in ItemSet.query.all()}
+                    
+                    for its_data in backup_data['item_sets']:
+                        its_id = its_data.get('id')
+                        if its_id in existing_item_sets:
+                            # 既存の備品セットを更新
+                            its = existing_item_sets[its_id]
+                        else:
+                            # 新規備品セットを作成
+                            its = ItemSet()
+                            db.session.add(its)
+                        
+                        its.name = its_data.get('name')
+                        its.description = its_data.get('description')
+                
+                # セット内容の復元
+                if backup_data.get('set_items'):
+                    # 既存のIDマッピングを作成
+                    existing_set_items = {si.id: si for si in SetItem.query.all()}
+                    
+                    for si_data in backup_data['set_items']:
+                        si_id = si_data.get('id')
+                        if si_id in existing_set_items:
+                            # 既存のセットアイテムを更新
+                            si = existing_set_items[si_id]
+                        else:
+                            # 新規セットアイテムを作成
+                            si = SetItem()
+                            db.session.add(si)
+                        
+                        si.patient_set_id = si_data.get('patient_set_id')
+                        si.item_set_id = si_data.get('item_set_id')
+                        si.item_id = si_data.get('item_id')
+                        si.quantity = si_data.get('quantity')
+                
+                # 変更をコミット
+                db.session.commit()
+                
+                flash('データを正常に復元しました', 'success')
+                return redirect(url_for('index'))
+            except Exception as e:
+                app.logger.error(f"リストアエラー: {e}")
+                flash(f'データ復元中にエラーが発生しました: {str(e)}', 'danger')
+                return redirect(request.url)
+    
+    return render_template('restore_data.html')
 
 # フォントの登録
 # プラットフォームに依存しないフォント設定

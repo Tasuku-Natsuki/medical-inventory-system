@@ -77,6 +77,15 @@
                             <i class="bi bi-gear"></i> クリニック設定
                         </a>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="bi bi-cloud"></i> データ管理
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('backup_data') }}">データバックアップ</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('restore_data') }}">データ復元</a></li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
         </div>
