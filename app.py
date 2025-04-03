@@ -806,9 +806,24 @@ def clear_all_data():
     return render_template('clear_all_data.html')
 
 # フォントの登録
-# 日本語フォントのパス（MS Gothicを使用）
-font_path = os.path.join(os.environ['WINDIR'], 'Fonts', 'msgothic.ttc')
-pdfmetrics.registerFont(TTFont('MS-Gothic', font_path))
+# プラットフォームに依存しないフォント設定
+try:
+    # Windows環境の場合
+    if os.name == 'nt' and 'WINDIR' in os.environ:
+        font_path = os.path.join(os.environ['WINDIR'], 'Fonts', 'msgothic.ttc')
+        pdfmetrics.registerFont(TTFont('MS-Gothic', font_path))
+    else:
+        # Linux/Mac環境の場合はDejaVuSansを使用
+        pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
+        # フォール名の別名登録
+        pdfmetrics.registerFontFamily('DejaVuSans', normal='DejaVuSans')
+        # MS-Gothicという名前でDejaVuSansを使用
+        pdfmetrics.registerFontFamily('MS-Gothic', normal='DejaVuSans')
+except Exception as e:
+    print(f"フォント登録エラー: {e}")
+    # フォント登録に失敗した場合はデフォルトのHelveticaを使用
+    # MS-Gothicの別名としてHelveticaを登録
+    pdfmetrics.registerFontFamily('MS-Gothic', normal='Helvetica')
 
 @app.route('/generate_pdf/<int:order_id>')
 def generate_pdf(order_id):
