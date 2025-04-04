@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, redirect, url_for, request, flash, send_file
+from flask import Flask, render_template, redirect, url_for, request, flash, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import io
@@ -11,18 +11,53 @@ from reportlab.lib.units import mm
 import json
 import csv
 from werkzeug.utils import secure_filename
+import logging
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '4ELMydzP8QszZd9yXG3U')
 
-# データベース設定
-# 本番環境では環境変数からURLを取得し、開発環境ではSQLiteを使用
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///inventory.db')
-# SQLite URLの修正（PostgreSQLとの互換性のため）
+# コンフィグ更新
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+
+# ログの設定
+is_production = os.environ.get('RENDER', False)
+if is_production:
+    # 本番環境ではファイルにログを出力
+    logging.basicConfig(
+        level=logging.ERROR,
+        format='%(asctime)s %(levelname)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    # エラーハンドラー設定
+    @app.errorhandler(500)
+    def internal_error(error):
+        app.logger.error(f'Server Error: {error}')
+        return "Internal Server Error: Please check the logs for details", 500
+else:
+    # 開発環境では詳細なログを出力
+    logging.basicConfig(level=logging.DEBUG)
+
+# SQLAlchemyの設定
+db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+if not os.path.exists(db_path):
+    os.makedirs(db_path)
+
+# データベースのパスを環境に応じて設定
+if is_production:
+    # Render環境では/tmpディレクトリを使用
+    db_file = '/tmp/inventory.db'
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
+else:
+    # ローカル環境ではinstanceディレクトリを使用
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///instance/inventory.db')
+
+# PostgreSQL URIの修正（Heroku対応）
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgres://', 'postgresql://', 1)
 
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# データベースの初期化
 db = SQLAlchemy(app)
 
 # テンプレートにグローバル変数を追加
@@ -145,17 +180,55 @@ class ClinicInfo(db.Model):
     def __repr__(self):
         return f'<ClinicInfo {self.name}>'
 
+# ログイン要求デコレータ
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ログイン
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # 固定のユーザー名とパスワードでチェック
+        if username == 'tasuku' and password == 'tasuku':
+            session['logged_in'] = True
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for('index'))
+        else:
+            flash('ユーザー名またはパスワードが正しくありません', 'danger')
+            
+    return render_template('login.html')
+
+# ログアウト
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    flash('ログアウトしました', 'info')
+    return redirect(url_for('login'))
+
 # ルート
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/items')
+@login_required
 def items():
     all_items = Item.query.all()
     return render_template('items.html', items=all_items)
 
 @app.route('/add_item', methods=['GET', 'POST'])
+@login_required
 def add_item():
     suppliers = Supplier.query.all()
     if request.method == 'POST':
@@ -181,11 +254,13 @@ def add_item():
     return render_template('add_item.html', suppliers=suppliers)
 
 @app.route('/suppliers')
+@login_required
 def suppliers():
     all_suppliers = Supplier.query.all()
     return render_template('suppliers.html', suppliers=all_suppliers)
 
 @app.route('/add_supplier', methods=['GET', 'POST'])
+@login_required
 def add_supplier():
     if request.method == 'POST':
         name = request.form['name']
@@ -206,11 +281,13 @@ def add_supplier():
     return render_template('add_supplier.html')
 
 @app.route('/patients')
+@login_required
 def patients():
     all_patients = Patient.query.all()
     return render_template('patients.html', patients=all_patients)
 
 @app.route('/add_patient', methods=['GET', 'POST'])
+@login_required
 def add_patient():
     if request.method == 'POST':
         name = request.form['name']
@@ -223,11 +300,13 @@ def add_patient():
     return render_template('add_patient.html')
 
 @app.route('/item_sets')
+@login_required
 def item_sets():
     all_item_sets = ItemSet.query.all()
     return render_template('item_sets.html', item_sets=all_item_sets)
 
 @app.route('/add_item_set', methods=['GET', 'POST'])
+@login_required
 def add_item_set():
     all_items = Item.query.all()
     
@@ -270,11 +349,13 @@ def add_item_set():
     return render_template('add_item_set.html', items=all_items)
 
 @app.route('/patient_sets')
+@login_required
 def patient_sets():
     all_patient_sets = PatientSet.query.all()
     return render_template('patient_sets.html', patient_sets=all_patient_sets)
 
 @app.route('/add_patient_set', methods=['GET', 'POST'])
+@login_required
 def add_patient_set():
     patients = Patient.query.all()
     all_items = Item.query.all()
@@ -328,6 +409,7 @@ def add_patient_set():
                           pre_selected_patient_id=pre_selected_patient_id)
 
 @app.route('/use_item', methods=['GET', 'POST'])
+@login_required
 def use_item():
     all_items = Item.query.all()
     patients = Patient.query.all()
@@ -423,6 +505,7 @@ def use_item():
     return render_template('use_item.html', items=all_items, patients=patients)
 
 @app.route('/use_set', methods=['GET', 'POST'])
+@login_required
 def use_set():
     patients = Patient.query.all()
     all_item_sets = ItemSet.query.all()
@@ -469,6 +552,7 @@ def use_set():
                           selected_patient_id=selected_patient_id)
 
 @app.route('/use_patient_set/<int:set_id>', methods=['GET', 'POST'])
+@login_required
 def use_patient_set(set_id):
     patient_set = PatientSet.query.get_or_404(set_id)
     set_items = SetItem.query.filter_by(patient_set_id=set_id).all()
@@ -553,6 +637,7 @@ def use_patient_set(set_id):
         return redirect(url_for('patient_sets'))
 
 @app.route('/use_item_set/<int:set_id>', methods=['GET'])
+@login_required
 def use_item_set(set_id):
     item_set = ItemSet.query.get_or_404(set_id)
     set_items = SetItem.query.filter_by(item_set_id=set_id).all()
@@ -653,17 +738,20 @@ def use_item_set(set_id):
     return redirect(url_for('index'))
 
 @app.route('/orders')
+@login_required
 def orders():
     all_orders = Order.query.order_by(Order.order_date.desc()).all()
     return render_template('orders.html', orders=all_orders)
 
 @app.route('/view_order/<int:order_id>')
+@login_required
 def view_order(order_id):
     order = Order.query.get_or_404(order_id)
     return render_template('view_order.html', order=order)
 
 # CSVファイルからの物品インポート
 @app.route('/import_items', methods=['GET', 'POST'])
+@login_required
 def import_items():
     suppliers = Supplier.query.all()
     
@@ -776,6 +864,7 @@ def import_items():
 
 # 既存データの削除
 @app.route('/clear_all_data', methods=['GET', 'POST'])
+@login_required
 def clear_all_data():
     if request.method == 'POST':
         try:
@@ -805,109 +894,375 @@ def clear_all_data():
     
     return render_template('clear_all_data.html')
 
+# バックアップ機能
+@app.route('/backup_data')
+@login_required
+def backup_data():
+    try:
+        # データベースの内容を取得
+        clinic_data = ClinicInfo.query.first()
+        items_data = Item.query.all()
+        suppliers_data = Supplier.query.all()
+        patients_data = Patient.query.all()
+        patient_sets_data = PatientSet.query.all()
+        item_sets_data = ItemSet.query.all()
+        set_items_data = SetItem.query.all()
+        
+        # JSONに変換するための辞書を作成
+        backup = {
+            'clinic': {} if not clinic_data else {
+                'name': clinic_data.name,
+                'address': clinic_data.address,
+                'phone': clinic_data.phone,
+                'fax': clinic_data.fax,
+                'email': clinic_data.email,
+                'website': clinic_data.website,
+                'director': clinic_data.director
+            },
+            'suppliers': [{
+                'id': s.id, 
+                'name': s.name, 
+                'fax_number': s.fax_number,
+                'address': s.address,
+                'email': s.email
+            } for s in suppliers_data],
+            'items': [{
+                'id': i.id,
+                'name': i.name,
+                'unit_type': i.unit_type,
+                'items_per_box': i.items_per_box,
+                'minimum_stock': i.minimum_stock,
+                'current_stock': i.current_stock,
+                'supplier_id': i.supplier_id
+            } for i in items_data],
+            'patients': [{
+                'id': p.id,
+                'name': p.name,
+                'patient_id': p.patient_id,
+                'address': p.address,
+                'phone': p.phone
+            } for p in patients_data],
+            'patient_sets': [{
+                'id': ps.id,
+                'name': ps.name,
+                'patient_id': ps.patient_id
+            } for ps in patient_sets_data],
+            'item_sets': [{
+                'id': its.id,
+                'name': its.name,
+                'description': its.description
+            } for its in item_sets_data],
+            'set_items': [{
+                'id': si.id,
+                'patient_set_id': si.patient_set_id,
+                'item_set_id': si.item_set_id,
+                'item_id': si.item_id,
+                'quantity': si.quantity
+            } for si in set_items_data]
+        }
+        
+        # JSON形式でダウンロード
+        response = jsonify(backup)
+        response.headers.set('Content-Disposition', 'attachment', filename='medical_inventory_backup.json')
+        return response
+    except Exception as e:
+        app.logger.error(f"バックアップエラー: {e}")
+        flash('バックアップの作成中にエラーが発生しました', 'danger')
+        return redirect(url_for('index'))
+
+# 復元機能
+@app.route('/restore_data', methods=['GET', 'POST'])
+@login_required
+def restore_data():
+    if request.method == 'POST':
+        if 'backup_file' not in request.files:
+            flash('バックアップファイルがありません', 'danger')
+            return redirect(request.url)
+            
+        file = request.files['backup_file']
+        if file.filename == '':
+            flash('ファイルが選択されていません', 'danger')
+            return redirect(request.url)
+            
+        if file:
+            try:
+                # JSONファイルを読み込む
+                backup_data = json.loads(file.read().decode('utf-8'))
+                
+                # クリニック情報の復元
+                if backup_data.get('clinic'):
+                    clinic = ClinicInfo.query.first()
+                    if not clinic:
+                        clinic = ClinicInfo()
+                        db.session.add(clinic)
+                    
+                    clinic_data = backup_data['clinic']
+                    clinic.name = clinic_data.get('name', 'クリニック名')
+                    clinic.address = clinic_data.get('address')
+                    clinic.phone = clinic_data.get('phone')
+                    clinic.fax = clinic_data.get('fax')
+                    clinic.email = clinic_data.get('email')
+                    clinic.website = clinic_data.get('website')
+                    clinic.director = clinic_data.get('director')
+                
+                # 発注先情報の復元
+                if backup_data.get('suppliers'):
+                    # 既存のIDマッピングを作成
+                    existing_suppliers = {s.id: s for s in Supplier.query.all()}
+                    
+                    for supplier_data in backup_data['suppliers']:
+                        supplier_id = supplier_data.get('id')
+                        if supplier_id in existing_suppliers:
+                            # 既存の発注先を更新
+                            supplier = existing_suppliers[supplier_id]
+                        else:
+                            # 新規発注先を作成
+                            supplier = Supplier()
+                            db.session.add(supplier)
+                        
+                        supplier.name = supplier_data.get('name')
+                        supplier.fax_number = supplier_data.get('fax_number')
+                        supplier.address = supplier_data.get('address')
+                        supplier.email = supplier_data.get('email')
+                
+                # 備品情報の復元
+                if backup_data.get('items'):
+                    # 既存のIDマッピングを作成
+                    existing_items = {i.id: i for i in Item.query.all()}
+                    
+                    for item_data in backup_data['items']:
+                        item_id = item_data.get('id')
+                        if item_id in existing_items:
+                            # 既存の備品を更新
+                            item = existing_items[item_id]
+                        else:
+                            # 新規備品を作成
+                            item = Item()
+                            db.session.add(item)
+                        
+                        item.name = item_data.get('name')
+                        item.unit_type = item_data.get('unit_type')
+                        item.items_per_box = item_data.get('items_per_box')
+                        item.minimum_stock = item_data.get('minimum_stock')
+                        item.current_stock = item_data.get('current_stock')
+                        item.supplier_id = item_data.get('supplier_id')
+                
+                # 患者情報の復元
+                if backup_data.get('patients'):
+                    # 既存のIDマッピングを作成
+                    existing_patients = {p.id: p for p in Patient.query.all()}
+                    
+                    for patient_data in backup_data['patients']:
+                        patient_id = patient_data.get('id')
+                        if patient_id in existing_patients:
+                            # 既存の患者を更新
+                            patient = existing_patients[patient_id]
+                        else:
+                            # 新規患者を作成
+                            patient = Patient()
+                            db.session.add(patient)
+                        
+                        patient.name = patient_data.get('name')
+                        patient.patient_id = patient_data.get('patient_id')
+                        patient.address = patient_data.get('address')
+                        patient.phone = patient_data.get('phone')
+                
+                # 患者セット情報の復元
+                if backup_data.get('patient_sets'):
+                    # 既存のIDマッピングを作成
+                    existing_patient_sets = {ps.id: ps for ps in PatientSet.query.all()}
+                    
+                    for ps_data in backup_data['patient_sets']:
+                        ps_id = ps_data.get('id')
+                        if ps_id in existing_patient_sets:
+                            # 既存の患者セットを更新
+                            ps = existing_patient_sets[ps_id]
+                        else:
+                            # 新規患者セットを作成
+                            ps = PatientSet()
+                            db.session.add(ps)
+                        
+                        ps.name = ps_data.get('name')
+                        ps.patient_id = ps_data.get('patient_id')
+                
+                # 備品セット情報の復元
+                if backup_data.get('item_sets'):
+                    # 既存のIDマッピングを作成
+                    existing_item_sets = {its.id: its for its in ItemSet.query.all()}
+                    
+                    for its_data in backup_data['item_sets']:
+                        its_id = its_data.get('id')
+                        if its_id in existing_item_sets:
+                            # 既存の備品セットを更新
+                            its = existing_item_sets[its_id]
+                        else:
+                            # 新規備品セットを作成
+                            its = ItemSet()
+                            db.session.add(its)
+                        
+                        its.name = its_data.get('name')
+                        its.description = its_data.get('description')
+                
+                # セット内容の復元
+                if backup_data.get('set_items'):
+                    # 既存のIDマッピングを作成
+                    existing_set_items = {si.id: si for si in SetItem.query.all()}
+                    
+                    for si_data in backup_data['set_items']:
+                        si_id = si_data.get('id')
+                        if si_id in existing_set_items:
+                            # 既存のセットアイテムを更新
+                            si = existing_set_items[si_id]
+                        else:
+                            # 新規セットアイテムを作成
+                            si = SetItem()
+                            db.session.add(si)
+                        
+                        si.patient_set_id = si_data.get('patient_set_id')
+                        si.item_set_id = si_data.get('item_set_id')
+                        si.item_id = si_data.get('item_id')
+                        si.quantity = si_data.get('quantity')
+                
+                # 変更をコミット
+                db.session.commit()
+                
+                flash('データを正常に復元しました', 'success')
+                return redirect(url_for('index'))
+            except Exception as e:
+                app.logger.error(f"リストアエラー: {e}")
+                flash(f'データ復元中にエラーが発生しました: {str(e)}', 'danger')
+                return redirect(request.url)
+    
+    return render_template('restore_data.html')
+
 # フォントの登録
-# 日本語フォントのパス（MS Gothicを使用）
-font_path = os.path.join(os.environ['WINDIR'], 'Fonts', 'msgothic.ttc')
-pdfmetrics.registerFont(TTFont('MS-Gothic', font_path))
+# プラットフォームに依存しないフォント設定
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.fonts import addMapping
+
+# ビルトインフォントを使用
+try:
+    # ReportLabのデフォルトフォントを使用
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
+    from reportlab.lib.fonts import addMapping
+    
+    # Helveticaをデフォルトフォントとして登録
+    pdfmetrics.registerFontFamily('Helvetica')
+    
+    # MS-GothicとしてHelveticaを使用（代替）
+    pdfmetrics.registerFontFamily('MS-Gothic', normal='Helvetica', bold='Helvetica-Bold')
+    
+    app.logger.info("デフォルトフォントを登録しました")
+except Exception as e:
+    app.logger.error(f"フォント登録エラー: {e}")
+    # フォント登録に失敗しても処理を続行
 
 @app.route('/generate_pdf/<int:order_id>')
+@login_required
 def generate_pdf(order_id):
-    order = Order.query.get_or_404(order_id)
-    supplier = order.supplier
-    order_items = OrderItem.query.filter_by(order_id=order.id).all()
-    
-    # クリニック情報を取得
-    clinic_info = ClinicInfo.query.first()
-    if not clinic_info:
-        clinic_info = ClinicInfo(name="訪問診療クリニック")
-        db.session.add(clinic_info)
-        db.session.commit()
-    
-    # PDF生成
-    buffer = io.BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    
-    # 日本語フォントを使用
-    p.setFont("MS-Gothic", 18)
-    p.drawString(50, 800, "発注書")
-    
-    # 発注日（右上）
-    p.setFont("MS-Gothic", 12)
-    p.drawString(400, 800, f"発注日: {order.order_date.strftime('%Y年%m月%d日')}")
-    p.drawString(400, 780, f"発注番号: {order.id}")
-    
-    # 発注先情報（左上）
-    y_supplier = 750
-    p.drawString(50, y_supplier, f"【発注先】")
-    p.drawString(50, y_supplier - 20, f"{supplier.name}")
-    
-    if supplier.address:
-        p.drawString(50, y_supplier - 40, f"住所: {supplier.address}")
-        y_supplier -= 20
-    
-    if supplier.fax_number:
-        p.drawString(50, y_supplier - 40, f"FAX: {supplier.fax_number}")
-        y_supplier -= 20
-    
-    if supplier.email:
-        p.drawString(50, y_supplier - 40, f"メール: {supplier.email}")
-    
-    # 発注元クリニック情報（右下）
-    y_clinic = 650
-    p.drawString(350, y_clinic, f"【発注元】")
-    p.drawString(350, y_clinic - 20, f"{clinic_info.name}")
-    
-    if clinic_info.director:
-        p.drawString(350, y_clinic - 40, f"院長: {clinic_info.director}")
-        y_clinic -= 20
+    try:
+        order = Order.query.get_or_404(order_id)
+        supplier = order.supplier
+        order_items = OrderItem.query.filter_by(order_id=order.id).all()
         
-    if clinic_info.address:
-        p.drawString(350, y_clinic - 40, f"住所: {clinic_info.address}")
-        y_clinic -= 20
-    
-    if clinic_info.phone:
-        p.drawString(350, y_clinic - 40, f"TEL: {clinic_info.phone}")
-        y_clinic -= 20
-    
-    if clinic_info.fax:
-        p.drawString(350, y_clinic - 40, f"FAX: {clinic_info.fax}")
-    
-    # 区切り線
-    p.line(50, 580, 550, 580)
-    
-    # テーブルヘッダー
-    p.setFont("MS-Gothic", 12)
-    p.drawString(50, 560, "商品名")
-    p.drawString(300, 560, "数量")
-    p.drawString(400, 560, "単位")
-    p.line(50, 550, 550, 550)
-    
-    # テーブル内容
-    y = 530
-    p.setFont("MS-Gothic", 12)
-    for order_item in order_items:
-        item = order_item.item
-        p.drawString(50, y, item.name)
-        p.drawString(300, y, str(order_item.quantity))
-        unit = "箱" if item.unit_type == "box" else "個"
-        p.drawString(400, y, unit)
-        y -= 20
-    
-    # 備考
-    p.drawString(50, 100, "備考:")
-    p.drawString(50, 80, "このFAXは自動生成されています。")
-    
-    p.showPage()
-    p.save()
-    buffer.seek(0)
-    
-    # 発注のステータスを更新
-    order.status = 'sent'
-    db.session.commit()
-    
-    return send_file(buffer, as_attachment=True, download_name=f"order_{order_id}.pdf", mimetype='application/pdf')
+        # クリニック情報を取得
+        clinic_info = ClinicInfo.query.first()
+        if not clinic_info:
+            clinic_info = ClinicInfo(name="訪問診療クリニック")
+            db.session.add(clinic_info)
+            db.session.commit()
+        
+        # PDF生成
+        buffer = io.BytesIO()
+        p = canvas.Canvas(buffer, pagesize=A4)
+        
+        # 日本語フォントを使用
+        p.setFont("MS-Gothic", 18)
+        p.drawString(50, 800, "発注書")
+        
+        # 発注日（右上）
+        p.setFont("MS-Gothic", 12)
+        p.drawString(400, 800, f"発注日: {order.order_date.strftime('%Y年%m月%d日')}")
+        p.drawString(400, 780, f"発注番号: {order.id}")
+        
+        # 発注先情報（左上）
+        y_supplier = 750
+        p.drawString(50, y_supplier, f"【発注先】")
+        p.drawString(50, y_supplier - 20, f"{supplier.name}")
+        
+        if supplier.address:
+            p.drawString(50, y_supplier - 40, f"住所: {supplier.address}")
+            y_supplier -= 20
+        
+        if supplier.fax_number:
+            p.drawString(50, y_supplier - 40, f"FAX: {supplier.fax_number}")
+            y_supplier -= 20
+        
+        if supplier.email:
+            p.drawString(50, y_supplier - 40, f"メール: {supplier.email}")
+        
+        # 発注元クリニック情報（右下）
+        y_clinic = 650
+        p.drawString(350, y_clinic, f"【発注元】")
+        p.drawString(350, y_clinic - 20, f"{clinic_info.name}")
+        
+        if clinic_info.director:
+            p.drawString(350, y_clinic - 40, f"院長: {clinic_info.director}")
+            y_clinic -= 20
+            
+        if clinic_info.address:
+            p.drawString(350, y_clinic - 40, f"住所: {clinic_info.address}")
+            y_clinic -= 20
+        
+        if clinic_info.phone:
+            p.drawString(350, y_clinic - 40, f"TEL: {clinic_info.phone}")
+            y_clinic -= 20
+        
+        if clinic_info.fax:
+            p.drawString(350, y_clinic - 40, f"FAX: {clinic_info.fax}")
+        
+        # 区切り線
+        p.line(50, 580, 550, 580)
+        
+        # テーブルヘッダー
+        p.setFont("MS-Gothic", 12)
+        p.drawString(50, 560, "商品名")
+        p.drawString(300, 560, "数量")
+        p.drawString(400, 560, "単位")
+        p.line(50, 550, 550, 550)
+        
+        # テーブル内容
+        y = 530
+        p.setFont("MS-Gothic", 12)
+        for order_item in order_items:
+            item = order_item.item
+            p.drawString(50, y, item.name)
+            p.drawString(300, y, str(order_item.quantity))
+            unit = "箱" if item.unit_type == "box" else "個"
+            p.drawString(400, y, unit)
+            y -= 20
+        
+        # 備考
+        p.drawString(50, 100, "備考:")
+        p.drawString(50, 80, "このFAXは自動生成されています。")
+        
+        p.showPage()
+        p.save()
+        buffer.seek(0)
+        
+        # 発注のステータスを更新
+        order.status = 'sent'
+        db.session.commit()
+        
+        return send_file(buffer, as_attachment=True, download_name=f"order_{order_id}.pdf", mimetype='application/pdf')
+    except Exception as e:
+        app.logger.error(f"PDF生成エラー: {e}")
+        flash(f'PDF生成中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/monthly_report', methods=['GET', 'POST'])
+@login_required
 def monthly_report():
     year = datetime.now().year
     month = datetime.now().month
@@ -958,6 +1313,7 @@ def monthly_report():
                           month=month)
 
 @app.route('/patient_set/<int:set_id>', methods=['GET', 'POST'])
+@login_required
 def patient_set_detail(set_id):
     patient_set = PatientSet.query.get_or_404(set_id)
     all_items = Item.query.all()
@@ -1002,6 +1358,7 @@ def patient_set_detail(set_id):
     )
 
 @app.route('/item_set/<int:set_id>', methods=['GET', 'POST'])
+@login_required
 def item_set_detail(set_id):
     item_set = ItemSet.query.get_or_404(set_id)
     all_items = Item.query.all()
@@ -1046,6 +1403,7 @@ def item_set_detail(set_id):
     )
 
 @app.route('/bulk_use_items', methods=['GET', 'POST'])
+@login_required
 def bulk_use_items():
     """複数備品を一括で使用登録する機能"""
     items = Item.query.all()
@@ -1138,6 +1496,7 @@ def bulk_use_items():
     return render_template('bulk_use_items.html', items=items, patients=patients)
 
 @app.route('/patient_sets_manage/<int:patient_id>')
+@login_required
 def patient_sets_manage(patient_id):
     # 患者情報を取得
     patient = Patient.query.get_or_404(patient_id)
@@ -1156,6 +1515,7 @@ def patient_sets_manage(patient_id):
     )
 
 @app.route('/delete_patient_set/<int:set_id>')
+@login_required
 def delete_patient_set(set_id):
     # 患者セットを取得
     patient_set = PatientSet.query.get_or_404(set_id)
@@ -1172,6 +1532,7 @@ def delete_patient_set(set_id):
     return redirect(url_for('patient_sets_manage', patient_id=patient_id))
 
 @app.route('/clinic_settings', methods=['GET', 'POST'])
+@login_required
 def clinic_settings():
     # クリニック情報を取得、なければ作成
     clinic_info = ClinicInfo.query.first()
@@ -1195,8 +1556,65 @@ def clinic_settings():
     
     return render_template('clinic_settings.html', clinic=clinic_info)
 
+@app.route('/edit_item/<int:item_id>', methods=['GET', 'POST'])
+@login_required
+def edit_item(item_id):
+    item = Item.query.get_or_404(item_id)
+    suppliers = Supplier.query.all()
+    
+    if request.method == 'POST':
+        item.name = request.form['name']
+        item.unit_type = request.form['unit_type']
+        
+        if item.unit_type == 'box' and request.form['items_per_box']:
+            item.items_per_box = int(request.form['items_per_box'])
+        else:
+            item.items_per_box = None
+            
+        item.minimum_stock = int(request.form['minimum_stock'])
+        item.current_stock = int(request.form['current_stock'])
+        
+        supplier_id = request.form.get('supplier_id')
+        if supplier_id and supplier_id != 'none':
+            item.supplier_id = int(supplier_id)
+        else:
+            item.supplier_id = None
+            
+        db.session.commit()
+        flash('備品情報を更新しました', 'success')
+        return redirect(url_for('items'))
+        
+    return render_template('edit_item.html', item=item, suppliers=suppliers)
+
+@app.route('/update_stock', methods=['POST'])
+@login_required
+def update_stock():
+    try:
+        item_id = request.form.get('item_id')
+        field = request.form.get('field')
+        value = request.form.get('value')
+        
+        if not all([item_id, field, value]):
+            return jsonify({'success': False, 'message': '必要なパラメータが不足しています'}), 400
+            
+        item = Item.query.get_or_404(item_id)
+        
+        if field == 'current_stock':
+            item.current_stock = int(value)
+        elif field == 'minimum_stock':
+            item.minimum_stock = int(value)
+        else:
+            return jsonify({'success': False, 'message': '無効なフィールドです'}), 400
+            
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        app.logger.error(f"在庫更新エラー: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # データベース初期化
 @app.route('/initialize_db')
+@login_required
 def initialize_db():
     db.drop_all()
     db.create_all()
