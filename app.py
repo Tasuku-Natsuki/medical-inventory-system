@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, redirect, url_for, request, flash, send_file, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, send_file, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import io
@@ -12,6 +12,7 @@ import json
 import csv
 from werkzeug.utils import secure_filename
 import logging
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '4ELMydzP8QszZd9yXG3U')
@@ -179,17 +180,55 @@ class ClinicInfo(db.Model):
     def __repr__(self):
         return f'<ClinicInfo {self.name}>'
 
+# ログイン要求デコレータ
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# ログイン
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # 固定のユーザー名とパスワードでチェック
+        if username == 'tasuku' and password == 'tasuku':
+            session['logged_in'] = True
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for('index'))
+        else:
+            flash('ユーザー名またはパスワードが正しくありません', 'danger')
+            
+    return render_template('login.html')
+
+# ログアウト
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    flash('ログアウトしました', 'info')
+    return redirect(url_for('login'))
+
 # ルート
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/items')
+@login_required
 def items():
     all_items = Item.query.all()
     return render_template('items.html', items=all_items)
 
 @app.route('/add_item', methods=['GET', 'POST'])
+@login_required
 def add_item():
     suppliers = Supplier.query.all()
     if request.method == 'POST':
@@ -215,11 +254,13 @@ def add_item():
     return render_template('add_item.html', suppliers=suppliers)
 
 @app.route('/suppliers')
+@login_required
 def suppliers():
     all_suppliers = Supplier.query.all()
     return render_template('suppliers.html', suppliers=all_suppliers)
 
 @app.route('/add_supplier', methods=['GET', 'POST'])
+@login_required
 def add_supplier():
     if request.method == 'POST':
         name = request.form['name']
@@ -240,11 +281,13 @@ def add_supplier():
     return render_template('add_supplier.html')
 
 @app.route('/patients')
+@login_required
 def patients():
     all_patients = Patient.query.all()
     return render_template('patients.html', patients=all_patients)
 
 @app.route('/add_patient', methods=['GET', 'POST'])
+@login_required
 def add_patient():
     if request.method == 'POST':
         name = request.form['name']
@@ -257,11 +300,13 @@ def add_patient():
     return render_template('add_patient.html')
 
 @app.route('/item_sets')
+@login_required
 def item_sets():
     all_item_sets = ItemSet.query.all()
     return render_template('item_sets.html', item_sets=all_item_sets)
 
 @app.route('/add_item_set', methods=['GET', 'POST'])
+@login_required
 def add_item_set():
     all_items = Item.query.all()
     
@@ -304,11 +349,13 @@ def add_item_set():
     return render_template('add_item_set.html', items=all_items)
 
 @app.route('/patient_sets')
+@login_required
 def patient_sets():
     all_patient_sets = PatientSet.query.all()
     return render_template('patient_sets.html', patient_sets=all_patient_sets)
 
 @app.route('/add_patient_set', methods=['GET', 'POST'])
+@login_required
 def add_patient_set():
     patients = Patient.query.all()
     all_items = Item.query.all()
@@ -362,6 +409,7 @@ def add_patient_set():
                           pre_selected_patient_id=pre_selected_patient_id)
 
 @app.route('/use_item', methods=['GET', 'POST'])
+@login_required
 def use_item():
     all_items = Item.query.all()
     patients = Patient.query.all()
@@ -457,6 +505,7 @@ def use_item():
     return render_template('use_item.html', items=all_items, patients=patients)
 
 @app.route('/use_set', methods=['GET', 'POST'])
+@login_required
 def use_set():
     patients = Patient.query.all()
     all_item_sets = ItemSet.query.all()
@@ -503,6 +552,7 @@ def use_set():
                           selected_patient_id=selected_patient_id)
 
 @app.route('/use_patient_set/<int:set_id>', methods=['GET', 'POST'])
+@login_required
 def use_patient_set(set_id):
     patient_set = PatientSet.query.get_or_404(set_id)
     set_items = SetItem.query.filter_by(patient_set_id=set_id).all()
@@ -587,6 +637,7 @@ def use_patient_set(set_id):
         return redirect(url_for('patient_sets'))
 
 @app.route('/use_item_set/<int:set_id>', methods=['GET'])
+@login_required
 def use_item_set(set_id):
     item_set = ItemSet.query.get_or_404(set_id)
     set_items = SetItem.query.filter_by(item_set_id=set_id).all()
@@ -687,17 +738,20 @@ def use_item_set(set_id):
     return redirect(url_for('index'))
 
 @app.route('/orders')
+@login_required
 def orders():
     all_orders = Order.query.order_by(Order.order_date.desc()).all()
     return render_template('orders.html', orders=all_orders)
 
 @app.route('/view_order/<int:order_id>')
+@login_required
 def view_order(order_id):
     order = Order.query.get_or_404(order_id)
     return render_template('view_order.html', order=order)
 
 # CSVファイルからの物品インポート
 @app.route('/import_items', methods=['GET', 'POST'])
+@login_required
 def import_items():
     suppliers = Supplier.query.all()
     
@@ -810,6 +864,7 @@ def import_items():
 
 # 既存データの削除
 @app.route('/clear_all_data', methods=['GET', 'POST'])
+@login_required
 def clear_all_data():
     if request.method == 'POST':
         try:
@@ -841,6 +896,7 @@ def clear_all_data():
 
 # バックアップ機能
 @app.route('/backup_data')
+@login_required
 def backup_data():
     try:
         # データベースの内容を取得
@@ -916,6 +972,7 @@ def backup_data():
 
 # 復元機能
 @app.route('/restore_data', methods=['GET', 'POST'])
+@login_required
 def restore_data():
     if request.method == 'POST':
         if 'backup_file' not in request.files:
@@ -1102,6 +1159,7 @@ except Exception as e:
     # フォント登録に失敗しても処理を続行
 
 @app.route('/generate_pdf/<int:order_id>')
+@login_required
 def generate_pdf(order_id):
     try:
         order = Order.query.get_or_404(order_id)
@@ -1204,6 +1262,7 @@ def generate_pdf(order_id):
         return redirect(url_for('index'))
 
 @app.route('/monthly_report', methods=['GET', 'POST'])
+@login_required
 def monthly_report():
     year = datetime.now().year
     month = datetime.now().month
@@ -1254,6 +1313,7 @@ def monthly_report():
                           month=month)
 
 @app.route('/patient_set/<int:set_id>', methods=['GET', 'POST'])
+@login_required
 def patient_set_detail(set_id):
     patient_set = PatientSet.query.get_or_404(set_id)
     all_items = Item.query.all()
@@ -1298,6 +1358,7 @@ def patient_set_detail(set_id):
     )
 
 @app.route('/item_set/<int:set_id>', methods=['GET', 'POST'])
+@login_required
 def item_set_detail(set_id):
     item_set = ItemSet.query.get_or_404(set_id)
     all_items = Item.query.all()
@@ -1342,6 +1403,7 @@ def item_set_detail(set_id):
     )
 
 @app.route('/bulk_use_items', methods=['GET', 'POST'])
+@login_required
 def bulk_use_items():
     """複数備品を一括で使用登録する機能"""
     items = Item.query.all()
@@ -1434,6 +1496,7 @@ def bulk_use_items():
     return render_template('bulk_use_items.html', items=items, patients=patients)
 
 @app.route('/patient_sets_manage/<int:patient_id>')
+@login_required
 def patient_sets_manage(patient_id):
     # 患者情報を取得
     patient = Patient.query.get_or_404(patient_id)
@@ -1452,6 +1515,7 @@ def patient_sets_manage(patient_id):
     )
 
 @app.route('/delete_patient_set/<int:set_id>')
+@login_required
 def delete_patient_set(set_id):
     # 患者セットを取得
     patient_set = PatientSet.query.get_or_404(set_id)
@@ -1468,6 +1532,7 @@ def delete_patient_set(set_id):
     return redirect(url_for('patient_sets_manage', patient_id=patient_id))
 
 @app.route('/clinic_settings', methods=['GET', 'POST'])
+@login_required
 def clinic_settings():
     # クリニック情報を取得、なければ作成
     clinic_info = ClinicInfo.query.first()
@@ -1492,6 +1557,7 @@ def clinic_settings():
     return render_template('clinic_settings.html', clinic=clinic_info)
 
 @app.route('/edit_item/<int:item_id>', methods=['GET', 'POST'])
+@login_required
 def edit_item(item_id):
     item = Item.query.get_or_404(item_id)
     suppliers = Supplier.query.all()
@@ -1521,6 +1587,7 @@ def edit_item(item_id):
     return render_template('edit_item.html', item=item, suppliers=suppliers)
 
 @app.route('/update_stock', methods=['POST'])
+@login_required
 def update_stock():
     try:
         item_id = request.form.get('item_id')
@@ -1547,6 +1614,7 @@ def update_stock():
 
 # データベース初期化
 @app.route('/initialize_db')
+@login_required
 def initialize_db():
     db.drop_all()
     db.create_all()
