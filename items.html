@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}備品一覧 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-box"></i> 備品一覧</h1>
+    <div>
+        <a href="{{ url_for('add_item') }}" class="btn btn-primary me-2">
+            <i class="bi bi-plus-circle"></i> 新規登録
+        </a>
+        <a href="{{ url_for('bulk_use_items') }}" class="btn btn-success">
+            <i class="bi bi-check2-all"></i> 一括使用
+        </a>
+    </div>
+</div>
+
+{% if items %}
+<div class="card">
+    <div class="card-body">
+        <div class="alert alert-info" id="editHelp" style="display: none;">
+            <i class="bi bi-info-circle"></i> 在庫数や最低在庫数の値をクリックすると、直接編集できます。
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>備品名</th>
+                        <th>単位</th>
+                        <th>箱あたり数量</th>
+                        <th>在庫数</th>
+                        <th>最低在庫数</th>
+                        <th>発注先</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.id }}</td>
+                        <td>{{ item.name }}</td>
+                        <td>{{ '箱' if item.unit_type == 'box' else '個' }}</td>
+                        <td>{{ item.items_per_box if item.unit_type == 'box' else '-' }}</td>
+                        <td class="editable-stock" data-item-id="{{ item.id }}" data-field="current_stock">
+                            <span class="stock-value">{{ item.current_stock }}</span>
+                            <input type="number" class="form-control form-control-sm stock-input" style="display: none;" min="0" value="{{ item.current_stock }}">
+                        </td>
+                        <td class="editable-stock" data-item-id="{{ item.id }}" data-field="minimum_stock">
+                            <span class="stock-value">{{ item.minimum_stock }}</span>
+                            <input type="number" class="form-control form-control-sm stock-input" style="display: none;" min="0" value="{{ item.minimum_stock }}">
+                        </td>
+                        <td>{{ item.supplier.name if item.supplier else '-' }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('use_item') }}?item_id={{ item.id }}" class="btn btn-sm btn-success">
+                                    <i class="bi bi-check-circle"></i> 使用
+                                </a>
+                                <a href="{{ url_for('edit_item', item_id=item.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-pencil"></i> 編集
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> 備品が登録されていません。「新規登録」から備品を追加してください。
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // ヘルプメッセージを表示
+        document.getElementById('editHelp').style.display = 'block';
+        
+        // 編集可能セルの処理
+        const editableCells = document.querySelectorAll('.editable-stock');
+        
+        editableCells.forEach(cell => {
+            const valueSpan = cell.querySelector('.stock-value');
+            const inputField = cell.querySelector('.stock-input');
+            
+            // クリックでフォームを表示
+            valueSpan.addEventListener('click', function() {
+                valueSpan.style.display = 'none';
+                inputField.style.display = 'block';
+                inputField.focus();
+                inputField.select();
+            });
+            
+            // フォーカスアウトで保存
+            inputField.addEventListener('blur', function() {
+                if (inputField.value !== valueSpan.textContent) {
+                    updateStock(cell.dataset.itemId, cell.dataset.field, inputField.value, valueSpan);
+                } else {
+                    valueSpan.style.display = 'block';
+                    inputField.style.display = 'none';
+                }
+            });
+            
+            // Enterキーで保存
+            inputField.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    inputField.blur();
+                }
+            });
+        });
+        
+        // 在庫更新関数
+        function updateStock(itemId, field, value, valueSpan) {
+            const formData = new FormData();
+            formData.append('item_id', itemId);
+            formData.append('field', field);
+            formData.append('value', value);
+            
+            const inputField = valueSpan.nextElementSibling;
+            
+            fetch('/update_stock', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 更新成功
+                    valueSpan.textContent = value;
+                    valueSpan.style.display = 'block';
+                    inputField.style.display = 'none';
+                    
+                    // 成功表示
+                    valueSpan.classList.add('text-success');
+                    setTimeout(() => {
+                        valueSpan.classList.remove('text-success');
+                    }, 2000);
+                } else {
+                    // エラー表示
+                    alert('更新に失敗しました: ' + data.message);
+                    valueSpan.style.display = 'block';
+                    inputField.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('エラー:', error);
+                alert('更新中にエラーが発生しました');
+                valueSpan.style.display = 'block';
+                inputField.style.display = 'none';
+            });
+        }
+    });
+</script>
+{% endblock %}

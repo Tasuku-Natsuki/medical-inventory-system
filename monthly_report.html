@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}月次レポート - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-bar-chart"></i> 月次レポート</h1>
+    <button onclick="window.print()" class="btn btn-secondary">
+        <i class="bi bi-printer"></i> 印刷
+    </button>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h2 class="h4 mb-0">レポート期間選択</h2>
+    </div>
+    <div class="card-body">
+        <form method="post" class="row g-3">
+            <div class="col-md-4">
+                <label for="year" class="form-label">年</label>
+                <select class="form-select" id="year" name="year">
+                    {% for y in range(2023, 2031) %}
+                    <option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}年</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="month" class="form-label">月</label>
+                <select class="form-select" id="month" name="month">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ m }}月</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> 表示
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row print-section">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h2 class="h4 mb-0">{{ year }}年{{ month }}月 使用量集計</h2>
+            </div>
+            <div class="card-body">
+                {% if usages %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>備品名</th>
+                                <th>使用量</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for usage in usages %}
+                            <tr>
+                                <td>{{ usage.name }}</td>
+                                <td>{{ usage.total_quantity }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> この期間の使用記録はありません。
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h2 class="h4 mb-0">{{ year }}年{{ month }}月 発注量集計</h2>
+            </div>
+            <div class="card-body">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>備品名</th>
+                                <th>発注量</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td>{{ order.name }}</td>
+                                <td>{{ order.total_quantity }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> この期間の発注記録はありません。
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .print-section, .print-section * {
+            visibility: visible;
+        }
+        .print-section {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+    }
+</style>
+{% endblock %}
+{% endblock %}

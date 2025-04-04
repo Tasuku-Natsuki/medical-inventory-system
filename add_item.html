@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}備品登録 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="h4 mb-0"><i class="bi bi-box"></i> 備品登録</h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">備品名 <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">単位タイプ <span class="text-danger">*</span></label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="unit_type" id="individual" value="individual" checked onchange="toggleBoxQuantity()">
+                            <label class="form-check-label" for="individual">個数単位</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="unit_type" id="box" value="box" onchange="toggleBoxQuantity()">
+                            <label class="form-check-label" for="box">箱単位</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="box-quantity-container" style="display: none;">
+                        <label for="items_per_box" class="form-label">箱あたりの個数</label>
+                        <input type="number" class="form-control" id="items_per_box" name="items_per_box" min="1">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="minimum_stock" class="form-label">最低在庫数 (発注点)</label>
+                        <input type="number" class="form-control" id="minimum_stock" name="minimum_stock" min="0" value="0">
+                        <div class="form-text">在庫がこの数量以下になると自動発注されます</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="current_stock" class="form-label">現在の在庫数</label>
+                        <input type="number" class="form-control" id="current_stock" name="current_stock" min="0" value="0">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="supplier_id" class="form-label">発注先</label>
+                        <select class="form-select" id="supplier_id" name="supplier_id">
+                            <option value="">-- 発注先を選択 --</option>
+                            {% for supplier in suppliers %}
+                            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">発注先を選択しない場合、発注書の自動生成は行われません</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('items') }}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-x-circle"></i> キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> 保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    function toggleBoxQuantity() {
+        const boxTypeRadio = document.getElementById('box');
+        const boxQuantityContainer = document.getElementById('box-quantity-container');
+        
+        if (boxTypeRadio.checked) {
+            boxQuantityContainer.style.display = 'block';
+            document.getElementById('items_per_box').setAttribute('required', '');
+        } else {
+            boxQuantityContainer.style.display = 'none';
+            document.getElementById('items_per_box').removeAttribute('required');
+        }
+    }
+</script>
+{% endblock %}
+{% endblock %}

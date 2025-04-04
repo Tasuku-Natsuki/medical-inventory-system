@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}セット編集 - {{ disease_set.name }} - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h2 class="h4 mb-0"><i class="bi bi-heart-pulse"></i> 疾患セット編集</h2>
+                <a href="{{ url_for('disease_sets') }}" class="btn btn-sm btn-light">
+                    <i class="bi bi-arrow-left"></i> 戻る
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">セット名</label>
+                        <p class="form-control-plaintext"><strong>{{ disease_set.name }}</strong></p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">説明</label>
+                        <p class="form-control-plaintext">{{ disease_set.description or '説明なし' }}</p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h4 class="h5 mb-3">セット内容</h4>
+                    
+                    <div id="items-container">
+                        {% if set_items %}
+                            {% for set_item in set_items %}
+                                <div class="row mb-2 item-row">
+                                    <div class="col-md-6">
+                                        <select name="item_id[]" class="form-select item-select" required>
+                                            <option value="">-- 備品を選択 --</option>
+                                            {% for item in all_items %}
+                                                <option value="{{ item.id }}" {% if item.id == set_item.item_id %}selected{% endif %}>
+                                                    {{ item.name }} (在庫: {{ item.current_stock }}{{ " 箱" if item.unit_type == 'box' else " 個" }})
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="input-group">
+                                            <input type="number" name="quantity[]" class="form-control" 
+                                                value="{{ set_item.quantity }}" min="1" required>
+                                            <span class="input-group-text">個</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger remove-item">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row mb-2 item-row">
+                                <div class="col-md-6">
+                                    <select name="item_id[]" class="form-select item-select" required>
+                                        <option value="">-- 備品を選択 --</option>
+                                        {% for item in all_items %}
+                                            <option value="{{ item.id }}">
+                                                {{ item.name }} (在庫: {{ item.current_stock }}{{ " 箱" if item.unit_type == 'box' else " 個" }})
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="input-group">
+                                        <input type="number" name="quantity[]" class="form-control" value="1" min="1" required>
+                                        <span class="input-group-text">個</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-outline-danger remove-item">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="my-3">
+                        <button type="button" id="add-item" class="btn btn-outline-primary">
+                            <i class="bi bi-plus-circle"></i> 備品追加
+                        </button>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> このセットを使用すると、登録されたすべての備品が一度に使用され、必要に応じて自動発注されます。
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('disease_sets') }}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-x-circle"></i> キャンセル
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> 保存
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 備品追加ボタン
+        document.getElementById('add-item').addEventListener('click', function() {
+            const container = document.getElementById('items-container');
+            const firstRow = document.querySelector('.item-row');
+            const newRow = firstRow.cloneNode(true);
+            
+            // 値をリセット
+            const select = newRow.querySelector('select');
+            select.value = '';
+            
+            const input = newRow.querySelector('input[type="number"]');
+            input.value = 1;
+            
+            // 削除ボタンのイベントを設定
+            const removeBtn = newRow.querySelector('.remove-item');
+            removeBtn.addEventListener('click', function() {
+                if (document.querySelectorAll('.item-row').length > 1) {
+                    this.closest('.item-row').remove();
+                }
+            });
+            
+            container.appendChild(newRow);
+        });
+        
+        // 既存の削除ボタンにイベントを設定
+        document.querySelectorAll('.remove-item').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                if (document.querySelectorAll('.item-row').length > 1) {
+                    this.closest('.item-row').remove();
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
