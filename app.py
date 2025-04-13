@@ -1685,5 +1685,16 @@ def initialize_db():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
+        # データベースファイルの存在を確認
+        db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'inventory.db')
+        if not os.path.exists(db_path):
+            # データベースファイルが存在しない場合のみテーブルを作成
+            db.create_all()
+            # 基本データの初期化（サプライヤーとクリニック情報）
+            if Supplier.query.count() == 0 and ClinicInfo.query.count() == 0:
+                from init_db import init_database
+                init_database()
+        else:
+            # 既存のデータベースファイルが存在する場合は必要に応じてマイグレーション
+            db.create_all()
     app.run(debug=True, host='0.0.0.0')
