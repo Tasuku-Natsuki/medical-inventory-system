@@ -16,6 +16,7 @@ from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '4ELMydzP8QszZd9yXG3U')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 # コンフィグ更新
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
