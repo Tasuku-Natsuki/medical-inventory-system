@@ -46,8 +46,11 @@ if not os.path.exists(db_path):
 
 # データベースのパスを環境に応じて設定
 if is_production:
-    # Render環境では/tmpディレクトリを使用
-    db_file = '/tmp/inventory.db'
+    # Render環境では永続的なデータディレクトリを使用
+    persistent_dir = os.environ.get('PERSISTENT_STORAGE_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'persistent_data'))
+    if not os.path.exists(persistent_dir):
+        os.makedirs(persistent_dir)
+    db_file = os.path.join(persistent_dir, 'inventory.db')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
 else:
     # ローカル環境ではinstanceディレクトリを使用
