@@ -1209,10 +1209,9 @@ try:
     from reportlab.lib.fonts import addMapping
     
     # Helveticaをデフォルトフォントとして登録
-    pdfmetrics.registerFontFamily('Helvetica')
-    
-    # MS-GothicとしてHelveticaを使用（代替）
-    pdfmetrics.registerFontFamily('MS-Gothic', normal='Helvetica', bold='Helvetica-Bold')
+    pdfmetrics.registerFont(TTFont('Helvetica', 'Helvetica'))
+    pdfmetrics.registerFont(TTFont('Helvetica-Bold', 'Helvetica-Bold'))
+    pdfmetrics.registerFontFamily('Helvetica', normal='Helvetica', bold='Helvetica-Bold')
     
     app.logger.info("デフォルトフォントを登録しました")
 except Exception as e:
@@ -1239,11 +1238,11 @@ def generate_pdf(order_id):
         p = canvas.Canvas(buffer, pagesize=A4)
         
         # 日本語フォントを使用
-        p.setFont("MS-Gothic", 18)
+        p.setFont("Helvetica", 18)
         p.drawString(50, 800, "発注書")
         
         # 発注日（右上）
-        p.setFont("MS-Gothic", 12)
+        p.setFont("Helvetica", 12)
         p.drawString(400, 800, f"発注日: {order.order_date.strftime('%Y年%m月%d日')}")
         p.drawString(400, 780, f"発注番号: {order.id}")
         
@@ -1287,7 +1286,7 @@ def generate_pdf(order_id):
         p.line(50, 580, 550, 580)
         
         # テーブルヘッダー
-        p.setFont("MS-Gothic", 12)
+        p.setFont("Helvetica", 12)
         p.drawString(50, 560, "商品名")
         p.drawString(300, 560, "数量")
         p.drawString(400, 560, "単位")
@@ -1295,7 +1294,7 @@ def generate_pdf(order_id):
         
         # テーブル内容
         y = 530
-        p.setFont("MS-Gothic", 12)
+        p.setFont("Helvetica", 12)
         for order_item in order_items:
             item = order_item.item
             p.drawString(50, y, item.name)
