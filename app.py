@@ -889,10 +889,11 @@ def create_order_pdf(order_id):
     
     for order_item in order_items:
         item = order_item.item
+        unit = "箱" if item.unit_type == "box" else "個"
         data.append([
             item.name,
             str(order_item.quantity),
-            item.unit or "個"
+            unit
         ])
     
     # テーブルスタイル
