@@ -53,8 +53,9 @@ if is_production:
     db_file = os.path.join(persistent_dir, 'inventory.db')
     app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
 else:
-    # ローカル環境ではinstanceディレクトリを使用
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///instance/inventory.db')
+    # ローカル環境では絶対パスを使用
+    db_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'inventory.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_file}'
 
 # PostgreSQL URIの修正（Heroku対応）
 if app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgres://'):
