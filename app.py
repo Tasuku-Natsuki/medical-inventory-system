@@ -6,7 +6,7 @@ import io
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, mm
 import json
 import csv
 from werkzeug.utils import secure_filename
@@ -814,7 +814,10 @@ def create_order_pdf(order_id):
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import A4, mm
+    
+    # 日本語フォントサポートをインポート
+    from japanese_pdf import setup_japanese_fonts, japanese_paragraph
     
     order = Order.query.get_or_404(order_id)
     supplier = order.supplier
@@ -830,84 +833,88 @@ def create_order_pdf(order_id):
     
     # PDF生成
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
     
-    # スタイルの設定
-    styles = getSampleStyleSheet()
+    # 日本語フォントと日本語用スタイルを設定
+    styles = setup_japanese_fonts()
+    
     elements = []
     
     # 文書タイトル
-    title_style = styles['Heading1']
-    title_style.alignment = 1  # 中央揃え
-    elements.append(Paragraph("発注書", title_style))
-    elements.append(Spacer(1, 10))
+    elements.append(japanese_paragraph("発注書", styles['JapaneseHeading1']))
+    elements.append(Spacer(1, 5*mm))
     
     # 発注情報（右上）
-    date_style = styles['Normal']
-    date_style.alignment = 2  # 右揃え
-    elements.append(Paragraph(f"発注日: {order.order_date.strftime('%Y年%m月%d日')}", date_style))
-    elements.append(Paragraph(f"発注番号: {order.id}", date_style))
-    elements.append(Spacer(1, 20))
+    elements.append(japanese_paragraph(f"発注日: {order.order_date.strftime('%Y年%m月%d日')}", styles['JapaneseRight']))
+    elements.append(japanese_paragraph(f"発注番号: {order.id}", styles['JapaneseRight']))
+    elements.append(Spacer(1, 10*mm))
     
     # 発注先情報
-    supplier_style = styles['Normal']
-    elements.append(Paragraph("<b>【発注先】</b>", supplier_style))
-    elements.append(Paragraph(f"{supplier.name}", supplier_style))
+    elements.append(japanese_paragraph("<b>【発注先】</b>", styles['JapaneseNormal']))
+    elements.append(japanese_paragraph(f"{supplier.name}", styles['JapaneseNormal']))
     
     if supplier.address:
-        elements.append(Paragraph(f"住所: {supplier.address}", supplier_style))
+        elements.append(japanese_paragraph(f"住所: {supplier.address}", styles['JapaneseNormal']))
     
     if supplier.fax_number:
-        elements.append(Paragraph(f"FAX: {supplier.fax_number}", supplier_style))
+        elements.append(japanese_paragraph(f"FAX: {supplier.fax_number}", styles['JapaneseNormal']))
     
     if supplier.email:
-        elements.append(Paragraph(f"メール: {supplier.email}", supplier_style))
+        elements.append(japanese_paragraph(f"メール: {supplier.email}", styles['JapaneseNormal']))
     
-    elements.append(Spacer(1, 20))
+    elements.append(Spacer(1, 10*mm))
     
     # 発注元クリニック情報
-    clinic_style = styles['Normal']
-    elements.append(Paragraph("<b>【発注元】</b>", clinic_style))
-    elements.append(Paragraph(f"{clinic_info.name}", clinic_style))
+    elements.append(japanese_paragraph("<b>【発注元】</b>", styles['JapaneseNormal']))
+    elements.append(japanese_paragraph(f"{clinic_info.name}", styles['JapaneseNormal']))
     
     if clinic_info.director:
-        elements.append(Paragraph(f"院長: {clinic_info.director}", clinic_style))
+        elements.append(japanese_paragraph(f"院長: {clinic_info.director}", styles['JapaneseNormal']))
     
     if clinic_info.address:
-        elements.append(Paragraph(f"住所: {clinic_info.address}", clinic_style))
+        elements.append(japanese_paragraph(f"住所: {clinic_info.address}", styles['JapaneseNormal']))
     
     if clinic_info.phone:
-        elements.append(Paragraph(f"TEL: {clinic_info.phone}", clinic_style))
+        elements.append(japanese_paragraph(f"TEL: {clinic_info.phone}", styles['JapaneseNormal']))
     
     if clinic_info.fax:
-        elements.append(Paragraph(f"FAX: {clinic_info.fax}", clinic_style))
+        elements.append(japanese_paragraph(f"FAX: {clinic_info.fax}", styles['JapaneseNormal']))
     
-    elements.append(Spacer(1, 30))
+    elements.append(Spacer(1, 15*mm))
     
     # 発注明細のテーブル
-    data = [["商品名", "数量", "単位"]]
+    data = [[japanese_paragraph("商品名", styles['JapaneseNormal']), 
+             japanese_paragraph("数量", styles['JapaneseNormal']), 
+             japanese_paragraph("単位", styles['JapaneseNormal'])]]
     
     for order_item in order_items:
         item = order_item.item
         unit = "箱" if item.unit_type == "box" else "個"
         data.append([
-            item.name,
-            str(order_item.quantity),
-            unit
+            japanese_paragraph(item.name, styles['JapaneseNormal']),
+            japanese_paragraph(str(order_item.quantity), styles['JapaneseNormal']),
+            japanese_paragraph(unit, styles['JapaneseNormal'])
         ])
     
     # テーブルスタイル
-    table = Table(data, colWidths=[300, 100, 100])
+    table = Table(data, colWidths=[doc.width*0.5, doc.width*0.25, doc.width*0.25])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('BOX', (0, 0), (-1, -1), 1, colors.black),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 5*mm),
+        ('TOPPADDING', (0, 0), (-1, 0), 5*mm),
     ]))
     
     elements.append(table)
+    
+    # 備考
+    elements.append(Spacer(1, 10*mm))
+    elements.append(japanese_paragraph("<b>備考:</b>", styles['JapaneseNormal']))
+    elements.append(japanese_paragraph("このFAXは自動生成されています。ご不明点は発注元までお問い合わせください。", styles['JapaneseNormal']))
     
     # PDFを生成
     doc.build(elements)
