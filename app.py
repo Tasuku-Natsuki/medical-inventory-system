@@ -1734,6 +1734,56 @@ def restore_data():
     
     return render_template('restore_data.html')
 
+# 発注先の一括設定機能
+@app.route('/bulk_assign_supplier', methods=['GET', 'POST'])
+@login_required
+def bulk_assign_supplier():
+    """発注先が未設定の備品に対して、一括で発注先を設定する機能"""
+    
+    # 発注先一覧を取得
+    suppliers = Supplier.query.order_by(Supplier.name).all()
+    
+    # 発注先が設定されていない備品を取得
+    items_without_supplier = Item.query.filter(Item.supplier_id.is_(None)).order_by(Item.name).all()
+    
+    if request.method == 'POST':
+        supplier_id = request.form.get('supplier_id')
+        item_ids = request.form.getlist('item_ids[]')
+        
+        if not supplier_id or not item_ids:
+            flash('発注先または備品が選択されていません', 'warning')
+            return redirect(url_for('bulk_assign_supplier'))
+        
+        try:
+            # 選択された発注先を取得
+            supplier = Supplier.query.get_or_404(supplier_id)
+            
+            # 選択された備品に発注先を設定
+            updated_count = 0
+            for item_id in item_ids:
+                item = Item.query.get(item_id)
+                if item and item.supplier_id is None:
+                    item.supplier_id = supplier.id
+                    updated_count += 1
+            
+            db.session.commit()
+            flash(f'{updated_count}件の備品に「{supplier.name}」を発注先として設定しました', 'success')
+            
+            # 未設定の備品がなくなったらメイン画面に戻る
+            if updated_count == len(items_without_supplier):
+                return redirect(url_for('items'))
+            else:
+                return redirect(url_for('bulk_assign_supplier'))
+            
+        except Exception as e:
+            db.session.rollback()
+            app.logger.error(f"発注先一括設定エラー: {e}")
+            flash(f'発注先の一括設定中にエラーが発生しました: {str(e)}', 'danger')
+    
+    return render_template('bulk_assign_supplier.html', 
+                          suppliers=suppliers,
+                          items_without_supplier=items_without_supplier)
+
 if __name__ == '__main__':
     with app.app_context():
         # データベースファイルの存在を確認

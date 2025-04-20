@@ -9,6 +9,9 @@
         <a href="{{ url_for('add_supplier') }}" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> 新規登録
         </a>
+        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="bi bi-file-earmark-arrow-up"></i> CSVインポート
+        </button>
     </div>
 </div>
 
@@ -83,4 +86,44 @@
     <i class="bi bi-info-circle"></i> 発注先が登録されていません。「新規登録」から発注先を追加してください。
 </div>
 {% endif %}
+
+<!-- CSVインポートモーダル -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="importModalLabel">
+                    <i class="bi bi-file-earmark-arrow-up"></i> 発注先CSVインポート
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('import_suppliers') }}" method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="csvFile" class="form-label">CSVファイル選択</label>
+                        <input type="file" class="form-control" id="csvFile" name="file" accept=".csv" required>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> CSVファイルのフォーマット:
+                        <ul>
+                            <li>必須列: name, fax_number</li>
+                            <li>任意列: address, email</li>
+                        </ul>
+                        <a href="{{ url_for('static', filename='templates/suppliers_import_template.csv') }}" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="bi bi-download"></i> テンプレートをダウンロード
+                        </a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> キャンセル
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-upload"></i> インポート
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

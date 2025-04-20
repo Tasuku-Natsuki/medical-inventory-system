@@ -9,8 +9,11 @@
         <a href="{{ url_for('add_item') }}" class="btn btn-primary me-2">
             <i class="bi bi-plus-circle"></i> 新規登録
         </a>
-        <a href="{{ url_for('bulk_use_items') }}" class="btn btn-success">
+        <a href="{{ url_for('bulk_use_items') }}" class="btn btn-success me-2">
             <i class="bi bi-check2-all"></i> 一括使用
+        </a>
+        <a href="{{ url_for('bulk_assign_supplier') }}" class="btn btn-info">
+            <i class="bi bi-link"></i> 発注先一括設定
         </a>
     </div>
 </div>
