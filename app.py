@@ -266,55 +266,72 @@ def suppliers():
 @login_required
 def add_supplier():
     if request.method == 'POST':
-        name = request.form['name']
-        fax_number = request.form['fax_number']
-        address = request.form.get('address', '')
-        email = request.form.get('email', '')
-        
-        new_supplier = Supplier(
-            name=name,
-            fax_number=fax_number,
-            address=address,
-            email=email
-        )
-        db.session.add(new_supplier)
-        db.session.commit()
-        flash('発注先を追加しました', 'success')
-        return redirect(url_for('suppliers'))
+        try:
+            name = request.form['name']
+            fax_number = request.form['fax_number']
+            address = request.form.get('address', '')
+            email = request.form.get('email', '')
+            
+            new_supplier = Supplier(
+                name=name,
+                fax_number=fax_number,
+                address=address,
+                email=email
+            )
+            db.session.add(new_supplier)
+            db.session.commit()
+            
+            flash('発注先を追加しました', 'success')
+            return redirect(url_for('suppliers'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'発注先の追加中にエラーが発生しました: {str(e)}', 'danger')
+            return redirect(url_for('add_supplier'))
     return render_template('add_supplier.html')
 
 @app.route('/edit_supplier/<int:supplier_id>', methods=['GET', 'POST'])
 @login_required
 def edit_supplier(supplier_id):
-    supplier = Supplier.query.get_or_404(supplier_id)
-    
-    if request.method == 'POST':
-        supplier.name = request.form['name']
-        supplier.fax_number = request.form['fax_number']
-        supplier.address = request.form.get('address', '')
-        supplier.email = request.form.get('email', '')
+    try:
+        supplier = Supplier.query.get_or_404(supplier_id)
         
-        db.session.commit()
-        flash('発注先情報を更新しました', 'success')
+        if request.method == 'POST':
+            supplier.name = request.form['name']
+            supplier.fax_number = request.form['fax_number']
+            supplier.address = request.form.get('address', '')
+            supplier.email = request.form.get('email', '')
+            
+            db.session.commit()
+            flash('発注先情報を更新しました', 'success')
+            return redirect(url_for('suppliers'))
+        
+        return render_template('edit_supplier.html', supplier=supplier)
+    except Exception as e:
+        db.session.rollback()
+        flash(f'発注先の編集中にエラーが発生しました: {str(e)}', 'danger')
         return redirect(url_for('suppliers'))
-    
-    return render_template('edit_supplier.html', supplier=supplier)
 
 @app.route('/delete_supplier/<int:supplier_id>')
 @login_required
 def delete_supplier(supplier_id):
-    supplier = Supplier.query.get_or_404(supplier_id)
+    try:
+        supplier = Supplier.query.get_or_404(supplier_id)
+        supplier_name = supplier.name
+        
+        # 関連する物品の発注先IDをNULLに設定
+        items = Item.query.filter_by(supplier_id=supplier_id).all()
+        for item in items:
+            item.supplier_id = None
+        
+        # 発注先を削除
+        db.session.delete(supplier)
+        db.session.commit()
+        
+        flash(f'発注先「{supplier_name}」を削除しました', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'発注先の削除中にエラーが発生しました: {str(e)}', 'danger')
     
-    # 関連する物品の発注先IDをNULLに設定
-    items = Item.query.filter_by(supplier_id=supplier_id).all()
-    for item in items:
-        item.supplier_id = None
-    
-    # 発注先を削除
-    db.session.delete(supplier)
-    db.session.commit()
-    
-    flash('発注先を削除しました', 'success')
     return redirect(url_for('suppliers'))
 
 @app.route('/patients')
