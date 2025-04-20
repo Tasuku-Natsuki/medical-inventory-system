@@ -22,6 +22,7 @@
                         <th>FAX番号</th>
                         <th>住所</th>
                         <th>メールアドレス</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -32,6 +33,36 @@
                         <td>{{ supplier.fax_number }}</td>
                         <td>{{ supplier.address or '-' }}</td>
                         <td>{{ supplier.email or '-' }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('edit_supplier', supplier_id=supplier.id) }}" class="btn btn-outline-primary">
+                                    <i class="bi bi-pencil"></i> 編集
+                                </a>
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ supplier.id }}">
+                                    <i class="bi bi-trash"></i> 削除
+                                </button>
+                            </div>
+                            
+                            <!-- 削除確認モーダル -->
+                            <div class="modal fade" id="deleteModal{{ supplier.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ supplier.id }}" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="deleteModalLabel{{ supplier.id }}">発注先の削除確認</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p><strong>{{ supplier.name }}</strong> を削除してもよろしいですか？</p>
+                                            <p class="text-danger">この操作は取り消せません。</p>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                                            <a href="{{ url_for('delete_supplier', supplier_id=supplier.id) }}" class="btn btn-danger">削除する</a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

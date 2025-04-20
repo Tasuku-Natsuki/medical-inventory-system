@@ -283,6 +283,40 @@ def add_supplier():
         return redirect(url_for('suppliers'))
     return render_template('add_supplier.html')
 
+@app.route('/edit_supplier/<int:supplier_id>', methods=['GET', 'POST'])
+@login_required
+def edit_supplier(supplier_id):
+    supplier = Supplier.query.get_or_404(supplier_id)
+    
+    if request.method == 'POST':
+        supplier.name = request.form['name']
+        supplier.fax_number = request.form['fax_number']
+        supplier.address = request.form.get('address', '')
+        supplier.email = request.form.get('email', '')
+        
+        db.session.commit()
+        flash('発注先情報を更新しました', 'success')
+        return redirect(url_for('suppliers'))
+    
+    return render_template('edit_supplier.html', supplier=supplier)
+
+@app.route('/delete_supplier/<int:supplier_id>')
+@login_required
+def delete_supplier(supplier_id):
+    supplier = Supplier.query.get_or_404(supplier_id)
+    
+    # 関連する物品の発注先IDをNULLに設定
+    items = Item.query.filter_by(supplier_id=supplier_id).all()
+    for item in items:
+        item.supplier_id = None
+    
+    # 発注先を削除
+    db.session.delete(supplier)
+    db.session.commit()
+    
+    flash('発注先を削除しました', 'success')
+    return redirect(url_for('suppliers'))
+
 @app.route('/patients')
 @login_required
 def patients():
