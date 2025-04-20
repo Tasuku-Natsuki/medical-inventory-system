@@ -261,8 +261,13 @@ def add_item():
 @app.route('/suppliers')
 @login_required
 def suppliers():
-    all_suppliers = Supplier.query.all()
-    return render_template('suppliers.html', suppliers=all_suppliers)
+    try:
+        all_suppliers = Supplier.query.all()
+        return render_template('suppliers.html', suppliers=all_suppliers)
+    except Exception as e:
+        app.logger.error(f"発注先一覧表示エラー: {str(e)}")
+        flash(f'発注先一覧の表示中にエラーが発生しました: {str(e)}', 'danger')
+        return redirect(url_for('index'))
 
 @app.route('/add_supplier', methods=['GET', 'POST'])
 @login_required
